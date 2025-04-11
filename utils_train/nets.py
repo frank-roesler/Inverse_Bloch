@@ -14,10 +14,8 @@ class MLPWithBoundary(nn.Module):
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
-        # Apply the neural network
         output = self.model(x)
-        # Enforce zero boundary conditions using x * (1 - x)
-        return output * (x - self.left_boundary) * (self.right_boundary - x)
+        return output # * (x - self.left_boundary) * (self.right_boundary - x)
 
 
 class SIREN(nn.Module):

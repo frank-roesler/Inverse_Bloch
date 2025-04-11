@@ -9,7 +9,7 @@ device = (
     if torch.backends.mps.is_available()
     else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 )
-print(device)
+print("Device:",device)
 
 inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
 
@@ -21,7 +21,6 @@ tAx = tAx.detach().requires_grad_(False)
 fAx = fAx.detach().requires_grad_(False)
 t_B1 = t_B1.detach().requires_grad_(False)
 
-
 target_z, target_xy = get_targets()
 target_z = target_z.to(device)
 target_xy = target_xy.to(device)
@@ -31,31 +30,22 @@ target_xy = target_xy.detach().requires_grad_(False)
 model = MLPWithBoundary(output_dim=3, hidden_dim=32, num_layers=2, left_boundary=tMin, right_boundary=tMax).float()
 model, optimizer, losses, best_loss, saved, save_timer = init_training(model, lr, device=device)
 
-infoscreen = InfoScreen(output_every=1)
-
+infoscreen = InfoScreen(output_every=10)
+model.train()
 for epoch in range(epochs + 1):
     # Compute frequency profile:
-    pulse_gradient = model(t_B1.detach())
+    pulse_gradient = model(t_B1)
     pulse = pulse_gradient[:, 0:1] + 1j * pulse_gradient[:, 1:2]
     gradient = gradient_scale * pulse_gradient[:, 2:]
 
-    print(pulse)
-    print(gradient)
-
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
-    loss = loss_fn(mz, mxy, target_z, target_xy)
-    print(loss)
-    print("-" * 100)
-    print(mz)
-    print(mxy)
+    L2Loss, DLoss = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
+    loss = L2Loss + DLoss
 
     losses.append(loss.item())
     optimizer.zero_grad()
-    print("optimizer.zero_grad done")
     loss.backward()
-    print("loss.backward done")
     optimizer.step()
-    print("optimizer.step done")
 
     infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.print_info(epoch, loss)
+    infoscreen.print_info(epoch, L2Loss, DLoss)
