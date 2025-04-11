@@ -397,26 +397,19 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
         B0 = B0.unsqueeze(1)
     bz = bz + B0.repeat(1, Nt)
 
-    # Determine if we need to return all states
-    returnallstate = kwargs.get("returnallstate", False)
-    if returnallstate:
-        a = torch.zeros((Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
-        b = torch.zeros((Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
-
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
-    Normfact = dt * gam / (Phi + 1e-12)  # Avoid division by zero
 
     # Loop over time
     for tt in range(Nt):
         phi = -Phi[:, tt]  # sign reverse to define clockwise rotation
-        normfact = Normfact[:, tt]
 
-        nxy = normfact * bxy[:, tt]
-        nxy[~torch.isfinite(nxy)] = 0.0
+        # nxy = normfact * bxy[:, tt]
+        # nxy[~torch.isfinite(nxy)] = 0.0
+        nxy = bxy[:, tt] / torch.sqrt(torch.abs(bxy[:, tt]) ** 2 + bz[:, tt] ** 2)
 
-        nz = normfact * bz[:, tt]
-        nz[~torch.isfinite(nz)] = 0.0
+        nz = bz[:, tt] / torch.sqrt(torch.abs(bxy[:, tt]) ** 2 + bz[:, tt] ** 2)
+        # nz[~torch.isfinite(nz)] = 0.0
 
         cp = torch.cos(phi / 2)
         sp = torch.sin(phi / 2)
@@ -429,15 +422,6 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
         statea = tmpa
         stateb = tmpb
-
-        if returnallstate:
-            a[:, tt] = statea
-            b[:, tt] = stateb
-
-    # Return final alpha, beta if not returning the whole state progression
-    if not returnallstate:
-        a = statea
-        b = stateb
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
@@ -459,30 +443,5 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     mxy = 2 * mz0 * torch.conj(statea) * stateb + mxy0 * torch.conj(statea) ** 2 - torch.conj(mxy0) * stateb**2
     mz = mz0 * (statea * torch.conj(statea) - stateb * torch.conj(stateb))
     mz = mz + 2 * torch.real(mxy0 * torch.conj(statea) * (-torch.conj(stateb)))
-
-    # If returning all, then convert to Mxy(t) Mz(t)
-    if returnallstate:
-        if M0.ndim == 1:
-            mxy0 = torch.complex(M0[0], M0[1])
-            mz0 = M0[2]
-
-            mxy0 = mxy0.expand(Ns)
-            mz0 = mz0.expand(Ns)
-        else:
-            if M0.shape[0] == 3:
-                mxy0 = torch.complex(M0[0], M0[1])
-                mz0 = M0[2]
-            else:
-                mxy0 = torch.complex(M0[:, 0], M0[:, 1])
-                mz0 = M0[:, 2]
-
-        mxyt = 2 * mz0.unsqueeze(1) * torch.conj(a) * b
-        mxyt = mxyt + mxy0.unsqueeze(1) * torch.conj(a) ** 2
-        mxyt = mxyt - torch.conj(mxy0).unsqueeze(1) * b**2
-
-        mzt = mz0.unsqueeze(1) * (a * torch.conj(a) - b * torch.conj(b))
-        mzt = mzt + 2 * torch.real(mxy0.unsqueeze(1) * torch.conj(a) * (-torch.conj(b)))
-
-        return mxy, mz.real, mxyt, mzt.real
 
     return mxy, mz.real

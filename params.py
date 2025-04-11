@@ -25,7 +25,7 @@ def get_fixed_inputs(module=np, device=torch.device("cpu")):
         tAx = tAx.astype(np.float32)
         fAx = fAx.astype(np.float32)
         t_B1 = t_B1.astype(np.float32)
-        return inputs, dt, Nz, sens, B0, G3, tAx, fAx, t_B1[:, np.newaxis]
+        return inputs, dt, Nz, sens, B0, tAx, fAx, t_B1[:, np.newaxis]
     elif module.__name__ == "torch":
         tAx = tAx.float()
         fAx = fAx.float()
@@ -39,7 +39,7 @@ def get_targets():
     B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
     mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
     target_z = mz > 0.5
-    target_xy = np.abs(mxy) > 0.5
+    target_xy = torch.abs(mxy) > 0.5
     return target_z.to(torch.float32), target_xy.to(torch.float32)
 
 
