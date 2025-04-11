@@ -399,7 +399,8 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
-    Normfact = torch.clamp(1 / torch.sqrt(torch.abs(bxy) ** 2 + bz**2), max=1e8)
+    Normfact = dt * gam / Phi
+    Normfact[~torch.isfinite(Normfact)] = 0.0  # Handle division by zero
 
     # Loop over time
     for tt in range(Nt):
@@ -410,7 +411,7 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
         nxy[~torch.isfinite(nxy)] = 0.0
 
         nz = normfact * bz[:, tt]
-        # nz[~torch.isfinite(nz)] = 0.0
+        nz[~torch.isfinite(nz)] = 0.0
 
         cp = torch.cos(phi / 2)
         sp = torch.sin(phi / 2)
