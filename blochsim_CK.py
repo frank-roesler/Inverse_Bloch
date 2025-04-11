@@ -405,19 +405,22 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     # Loop over time
     for tt in range(Nt):
         phi = -Phi[:, tt]  # sign reverse to define clockwise rotation
-        normfact = Normfact[:, tt]
-
-        nxy = normfact * bxy[:, tt]
-        nxy[~torch.isfinite(nxy)] = 0.0
-
-        nz = normfact * bz[:, tt]
-        nz[~torch.isfinite(nz)] = 0.0
 
         cp = torch.cos(phi / 2)
         sp = torch.sin(phi / 2)
 
-        alpha = cp - 1j * nz * sp
-        beta = -1j * nxy * sp
+        alpha = cp - 1j*bz[:, tt]*gam*dt*(0.5 - phi**2/48)
+        beta = -1j*bxy[:, tt]*gam*dt*(0.5 - phi**2/48)
+
+        # print('='*100)
+        # print(f'alpha: {alpha}')
+        # print(f'alphaNew: {alphaNew}')
+        # print(f'alpha diff: {torch.max(torch.abs(alpha-alphaNew))}')
+        # print('-'*100)
+        # print(f'beta: {beta}')
+        # print(f'betaNew: {betaNew}')
+        # print(f'beta diff: {torch.max(torch.abs(beta-betaNew))}')
+        # print('='*100)
 
         tmpa = alpha * statea - torch.conj(beta) * stateb
         tmpb = beta * statea + torch.conj(alpha) * stateb
