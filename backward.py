@@ -44,6 +44,10 @@ for epoch in range(epochs + 1):
 
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
     loss = loss_fn(mz, mxy, target_z, target_xy)
+    print(loss)
+    print("-" * 100)
+    print(mz)
+    print(mxy)
 
     losses.append(loss.item())
     optimizer.zero_grad()

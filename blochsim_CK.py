@@ -399,16 +399,17 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
+    Normfact = torch.clamp(1 / torch.sqrt(torch.abs(bxy) ** 2 + bz**2), max=1e8)
 
     # Loop over time
     for tt in range(Nt):
         phi = -Phi[:, tt]  # sign reverse to define clockwise rotation
+        normfact = Normfact[:, tt]
 
-        # nxy = normfact * bxy[:, tt]
-        # nxy[~torch.isfinite(nxy)] = 0.0
-        nxy = bxy[:, tt] / torch.sqrt(torch.abs(bxy[:, tt]) ** 2 + bz[:, tt] ** 2)
+        nxy = normfact * bxy[:, tt]
+        nxy[~torch.isfinite(nxy)] = 0.0
 
-        nz = bz[:, tt] / torch.sqrt(torch.abs(bxy[:, tt]) ** 2 + bz[:, tt] ** 2)
+        nz = normfact * bz[:, tt]
         # nz[~torch.isfinite(nz)] = 0.0
 
         cp = torch.cos(phi / 2)
