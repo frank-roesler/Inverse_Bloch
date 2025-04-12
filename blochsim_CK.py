@@ -406,14 +406,16 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
     cp = torch.cos(Phi / 2)
-    alpha = cp - 1j * bz * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
-    beta = -1j * bxy * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
+    sinc_part = 1j * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
+    alpha = cp - bz * sinc_part
+    beta = -bxy * sinc_part
+    alphaBar = torch.conj(alpha)
+    betaBar = torch.conj(beta)
 
     # Loop over time
     for tt in range(Nt):
-
-        tmpa = alpha[:, tt] * statea - torch.conj(beta[:, tt]) * stateb
-        stateb = beta[:, tt] * statea + torch.conj(alpha[:, tt]) * stateb
+        tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
+        stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
         statea = tmpa
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)

@@ -36,7 +36,6 @@ infoscreen = InfoScreen(output_every=10)
 trainLogger = TrainLogger(save_every=10)
 model.train()
 for epoch in range(epochs + 1):
-    # Compute frequency profile:
     pulse_gradient = model(t_B1)
     pulse = pulse_gradient[:, 0:1] + 1j * pulse_gradient[:, 1:2]
     gradient = gradient_scale * pulse_gradient[:, 2:]

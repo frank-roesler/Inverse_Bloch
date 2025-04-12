@@ -10,7 +10,9 @@ def get_fixed_inputs(module=np, device=torch.device("cpu")):
     inputs["returnallstates"] = False
     inputs["dt"] = inputs["dtmb"].item()
     dt = inputs["dt"]
-    pos = torch.from_numpy(inputs["pos"]).to(torch.float32).detach().requires_grad_(False)
+    pos = (
+        torch.from_numpy(inputs["pos"]).to(torch.float32).detach().requires_grad_(False)
+    )
     inputs["pos"] = pos.to(device)
     Nz = 4096
     sens = module.ones((Nz, 1), dtype=module.complex64)
@@ -30,7 +32,16 @@ def get_fixed_inputs(module=np, device=torch.device("cpu")):
         tAx = tAx.float()
         fAx = fAx.float()
         t_B1 = t_B1.float()
-        return inputs, dt, Nz, sens.to(device), B0, tAx, fAx, t_B1.unsqueeze(1).to(device)
+        return (
+            inputs,
+            dt,
+            Nz,
+            sens.to(device),
+            B0,
+            tAx,
+            fAx,
+            t_B1.unsqueeze(1).to(device),
+        )
 
 
 def get_targets():
@@ -46,4 +57,4 @@ def get_targets():
 # TRAINING PARAMETERS:
 epochs = 1000
 lr = 2e-3
-gradient_scale = 100.0  # relative size of gradient to RF pulse
+gradient_scale = 200.0  # relative size of gradient to RF pulse

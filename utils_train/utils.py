@@ -24,7 +24,7 @@ class TrainLogger:
         self.log["gradient"] = gradient
         self.save(epoch, losses)
 
-    def save(self, epoch, losses, filename="train_log.pt"):
+    def save(self, epoch, losses, filename="results/train_log.pt"):
         if not epoch % self.save_every == 0:
             return
         if not np.mean(losses[-4:]) < self.best_loss:
@@ -119,7 +119,7 @@ class InfoScreen:
             self.r.set_ydata(losses)
 
             self.fig.canvas.draw()
-            plt.savefig("training.png", dpi=300)
+            plt.savefig("results/training.png", dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 
@@ -150,4 +150,4 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
         + torch.sqrt(gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale
     )
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2)
-    return L2_loss, D_Loss  # + H1_loss
+    return L2_loss, 10 * D_Loss  # + H1_loss
