@@ -13,8 +13,6 @@ print("Device:", device)
 
 inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
 
-tMin = t_B1[0].item()
-tMax = t_B1[-1].item()
 sens = sens.detach().requires_grad_(False)
 B0 = B0.detach().requires_grad_(False)
 tAx = tAx.detach().requires_grad_(False)
@@ -27,14 +25,17 @@ target_xy = target_xy.to(device)
 targets_z = target_z.detach().requires_grad_(False)
 target_xy = target_xy.detach().requires_grad_(False)
 
-model = MLPWithBoundary(
-    output_dim=3, hidden_dim=16, num_layers=2, left_boundary=tMin, right_boundary=tMax
-).float()
+model = FourierMLP(output_dim=3, hidden_dim=8, num_layers=2).float()
 model, optimizer, losses = init_training(model, lr, device=device)
 
-infoscreen = InfoScreen(output_every=10)
+model = pre_train(
+    target_pulse=torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False),
+    target_gradient=torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False),
+    model=model,
+)
+
+infoscreen = InfoScreen(output_every=1)
 trainLogger = TrainLogger(save_every=10)
-model.train()
 for epoch in range(epochs + 1):
     pulse_gradient = model(t_B1)
     pulse = pulse_gradient[:, 0:1] + 1j * pulse_gradient[:, 1:2]
@@ -49,10 +50,6 @@ for epoch in range(epochs + 1):
     loss.backward()
     optimizer.step()
 
-    infoscreen.plot_info(
-        epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
-    )
+    infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
     infoscreen.print_info(epoch, L2Loss, DLoss)
-    trainLogger.log_epoch(
-        epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient
-    )
+    trainLogger.log_epoch(epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient)

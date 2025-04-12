@@ -2,7 +2,7 @@ from time import time
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
-from params import gradient_scale
+from params import gradient_scale, get_fixed_inputs
 
 
 class TrainLogger:
@@ -11,9 +11,7 @@ class TrainLogger:
         self.save_every = save_every
         self.best_loss = np.inf
 
-    def log_epoch(
-        self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient
-    ):
+    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
@@ -60,9 +58,7 @@ class InfoScreen:
         self.ax[2].set_title("Loss")
         self.ax[3].set_title("Gradient")
 
-    def plot_info(
-        self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
-    ):
+    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
         """plots info curves during training"""
         fmin = -10  # torch.min(fAx).item()
         fmax = 10  # torch.max(fAx).item()
@@ -89,14 +85,9 @@ class InfoScreen:
                     1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                 )
             )
-            self.ax[2].set_ylim(
-                (0.9 * np.min(losses).item(), 1.1 * np.max(losses).item())
-            )
+            self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
             self.ax[3].set_ylim(
-                (
-                    -1.1 * np.max(np.abs(gradient_plot)).item(),
-                    1.1 * np.max(np.abs(gradient_plot)).item(),
-                )
+                (-1.1 * np.max(np.abs(gradient_plot)).item(), 1.1 * np.max(np.abs(gradient_plot)).item())
             )
 
             self.p1.set_xdata(fAx)
@@ -133,18 +124,47 @@ class InfoScreen:
         print("-" * 100)
 
 
-def init_training(model_pulse, lr, device=torch.device("cpu")):
-    model_pulse = model_pulse.to(device)
-    optimizer_pulse = torch.optim.AdamW(model_pulse.parameters(), lr=lr)
+def pre_train(target_pulse, target_gradient, model):
+    device = (
+        torch.device("mps")
+        if torch.backends.mps.is_available()
+        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
+    target_pulse = target_pulse.to(device)
+    target_gradient = target_gradient.to(device)
+    model, optimizer, losses = init_training(model, lr=1e-2, device=device)
+    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
+    for epoch in range(10000):
+        model_output = model(t_B1)
+
+        loss_pulse_real = torch.mean((model_output[:, 0:1] - torch.real(target_pulse)) ** 2)
+        loss_pulse_imag = torch.mean((model_output[:, 1:2] - torch.imag(target_pulse)) ** 2)
+        loss_gradient = torch.mean((gradient_scale * model_output[:, 2:] - target_gradient) ** 2)
+        loss = loss_pulse_real + loss_pulse_imag + loss_gradient
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        if epoch % 100 == 0:
+            print(f"Epoch: {epoch}, Loss: {loss.item():.4f}")
+    plt.plot(loss_pulse_real.detach().cpu().numpy(), label="pulse real")
+    # plt.plot(loss_pulse_imag.detach().cpu().numpy(), label="pulse imag")
+    # plt.plot(loss_gradient.detach().cpu().numpy(), label="gradient")
+    plt.show()
+    return model
+
+
+def init_training(model, lr, device=torch.device("cpu")):
+    model = model.to(device)
+    model.train()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     losses = []
-    return model_pulse, optimizer_pulse, losses
+    return model, optimizer, losses
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean(
-        (xy_profile_abs - tgt_xy) ** 2
-    )
+    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     D_Loss = (
         torch.sqrt(torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2)
         + torch.sqrt(gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale
