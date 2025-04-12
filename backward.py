@@ -25,14 +25,12 @@ target_xy = target_xy.to(device)
 targets_z = target_z.detach().requires_grad_(False)
 target_xy = target_xy.detach().requires_grad_(False)
 
-model = FourierMLP(output_dim=3, hidden_dim=8, num_layers=2).float()
+model = FourierMLP(output_dim=3, hidden_dim=64, num_layers=3).float()
 model, optimizer, losses = init_training(model, lr, device=device)
 
-model = pre_train(
-    target_pulse=torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False),
-    target_gradient=torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False),
-    model=model,
-)
+B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
+G = torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False).to(device)
+model = pre_train(target_pulse=B1, target_gradient=G, model=model)
 
 infoscreen = InfoScreen(output_every=1)
 trainLogger = TrainLogger(save_every=10)

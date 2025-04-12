@@ -132,24 +132,32 @@ def pre_train(target_pulse, target_gradient, model):
     )
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
-    model, optimizer, losses = init_training(model, lr=1e-2, device=device)
+    model, optimizer, losses = init_training(model, lr=2e-5, device=device)
     inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
-    for epoch in range(10000):
+    loss = torch.inf
+    epoch = 0
+    while loss > 3e-5:
+        epoch += 1
         model_output = model(t_B1)
 
         loss_pulse_real = torch.mean((model_output[:, 0:1] - torch.real(target_pulse)) ** 2)
         loss_pulse_imag = torch.mean((model_output[:, 1:2] - torch.imag(target_pulse)) ** 2)
         loss_gradient = torch.mean((gradient_scale * model_output[:, 2:] - target_gradient) ** 2)
-        loss = loss_pulse_real + loss_pulse_imag + loss_gradient
+        loss = loss_pulse_real + loss_pulse_imag + loss_gradient / gradient_scale
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         if epoch % 100 == 0:
-            print(f"Epoch: {epoch}, Loss: {loss.item():.4f}")
-    plt.plot(loss_pulse_real.detach().cpu().numpy(), label="pulse real")
-    # plt.plot(loss_pulse_imag.detach().cpu().numpy(), label="pulse imag")
-    # plt.plot(loss_gradient.detach().cpu().numpy(), label="gradient")
+            print(f"Epoch: {epoch}, Loss: {loss.item():.6f}")
+    plt.figure()
+    plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
+    plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
+    plt.figure()
+    plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
+    plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
+    plt.figure()
+    plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
     plt.show()
     return model
 
@@ -166,8 +174,9 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
     L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     D_Loss = (
-        torch.sqrt(torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2)
-        + torch.sqrt(gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale
+        torch.abs(pulse[0]) ** 2
+        + torch.abs(pulse[-1]) ** 2
+        + (gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale**2
     )
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2)
     return L2_loss, 10 * D_Loss  # + H1_loss
