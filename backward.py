@@ -27,7 +27,7 @@ target_xy = target_xy.to(device)
 targets_z = target_z.detach().requires_grad_(False)
 target_xy = target_xy.detach().requires_grad_(False)
 
-model = MLPWithBoundary(output_dim=3, hidden_dim=32, num_layers=2, left_boundary=tMin, right_boundary=tMax).float()
+model = MLPWithBoundary(output_dim=3, hidden_dim=64, num_layers=3, left_boundary=tMin, right_boundary=tMax).float()
 model, optimizer, losses, best_loss, saved, save_timer = init_training(model, lr, device=device)
 
 infoscreen = InfoScreen(output_every=10)

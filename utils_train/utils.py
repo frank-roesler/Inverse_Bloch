@@ -81,6 +81,7 @@ class InfoScreen:
             self.r.set_ydata(losses)
 
             self.fig.canvas.draw()
+            plt.savefig("training.png", dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 

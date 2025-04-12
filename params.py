@@ -45,5 +45,5 @@ def get_targets():
 
 # TRAINING PARAMETERS:
 epochs = 1000
-lr = 1e-3
-gradient_scale = 500.0  # relative size of gradient to RF pulse
+lr = 2e-3
+gradient_scale = 100.0  # relative size of gradient to RF pulse
