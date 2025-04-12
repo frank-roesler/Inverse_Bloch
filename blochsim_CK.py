@@ -374,7 +374,9 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     dt = kwargs.get("dt", 6.4e-6)
 
     # Handle M0 initialization
-    M0 = kwargs.get("M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False))
+    M0 = kwargs.get(
+        "M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False)
+    )
     if M0.ndim == 1:
         M0 = M0.to(B1.device)
 
@@ -383,8 +385,12 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     Nt = G.shape[0]  # Number of time points
 
     # Initialize state variables
-    statea = torch.ones(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
-    stateb = torch.zeros(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
+    statea = torch.ones(
+        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
+    )
+    stateb = torch.zeros(
+        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
+    )
 
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)
@@ -399,31 +405,16 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
+    cp = torch.cos(Phi / 2)
+    alpha = cp - 1j * bz * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
+    beta = -1j * bxy * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
 
     # Loop over time
     for tt in range(Nt):
-        phi = -Phi[:, tt]  # sign reverse to define clockwise rotation
 
-        cp = torch.cos(phi / 2)
-
-        alpha = cp - 1j * bz[:, tt] * gam * dt * (0.5 - phi**2 / 48)
-        beta = -1j * bxy[:, tt] * gam * dt * (0.5 - phi**2 / 48)
-
-        # print('='*100)
-        # print(f'alpha: {alpha}')
-        # print(f'alphaNew: {alphaNew}')
-        # print(f'alpha diff: {torch.max(torch.abs(alpha-alphaNew))}')
-        # print('-'*100)
-        # print(f'beta: {beta}')
-        # print(f'betaNew: {betaNew}')
-        # print(f'beta diff: {torch.max(torch.abs(beta-betaNew))}')
-        # print('='*100)
-
-        tmpa = alpha * statea - torch.conj(beta) * stateb
-        tmpb = beta * statea + torch.conj(alpha) * stateb
-
+        tmpa = alpha[:, tt] * statea - torch.conj(beta[:, tt]) * stateb
+        stateb = beta[:, tt] * statea + torch.conj(alpha[:, tt]) * stateb
         statea = tmpa
-        stateb = tmpb
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
@@ -442,7 +433,11 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    mxy = 2 * mz0 * torch.conj(statea) * stateb + mxy0 * torch.conj(statea) ** 2 - torch.conj(mxy0) * stateb**2
+    mxy = (
+        2 * mz0 * torch.conj(statea) * stateb
+        + mxy0 * torch.conj(statea) ** 2
+        - torch.conj(mxy0) * stateb**2
+    )
     mz = mz0 * (statea * torch.conj(statea) - stateb * torch.conj(stateb))
     mz = mz + 2 * torch.real(mxy0 * torch.conj(statea) * (-torch.conj(stateb)))
 

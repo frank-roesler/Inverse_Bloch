@@ -9,7 +9,7 @@ device = (
     if torch.backends.mps.is_available()
     else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 )
-print("Device:",device)
+print("Device:", device)
 
 inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
 
@@ -27,10 +27,13 @@ target_xy = target_xy.to(device)
 targets_z = target_z.detach().requires_grad_(False)
 target_xy = target_xy.detach().requires_grad_(False)
 
-model = MLPWithBoundary(output_dim=3, hidden_dim=64, num_layers=3, left_boundary=tMin, right_boundary=tMax).float()
-model, optimizer, losses, best_loss, saved, save_timer = init_training(model, lr, device=device)
+model = MLPWithBoundary(
+    output_dim=3, hidden_dim=16, num_layers=2, left_boundary=tMin, right_boundary=tMax
+).float()
+model, optimizer, losses = init_training(model, lr, device=device)
 
 infoscreen = InfoScreen(output_every=10)
+trainLogger = TrainLogger(save_every=10)
 model.train()
 for epoch in range(epochs + 1):
     # Compute frequency profile:
@@ -47,5 +50,10 @@ for epoch in range(epochs + 1):
     loss.backward()
     optimizer.step()
 
-    infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(
+        epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
+    )
     infoscreen.print_info(epoch, L2Loss, DLoss)
+    trainLogger.log_epoch(
+        epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient
+    )

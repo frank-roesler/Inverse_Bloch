@@ -8,9 +8,6 @@ inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch)
 
 B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
 G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-print(B1.shape)
-print(G.shape)
-
 
 mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
 
@@ -22,8 +19,6 @@ bw = (1.0 / max(tAx)) * len(tAx)
 fAx = np.linspace(-bw, bw, len(tAx)) * 1e-6 * 2 * np.pi
 t_B1 = np.arange(0, len(B1)) * dt * 1e3
 
-
-print(mxy.shape)
 
 fig, ax = plt.subplots(2, 2, figsize=(12, 6))
 ax[0, 1].plot(t_B1, inputs["Gs"], linewidth=0.8)

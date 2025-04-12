@@ -5,6 +5,35 @@ import numpy as np
 from params import gradient_scale
 
 
+class TrainLogger:
+    def __init__(self, save_every=1):
+        self.log = {}
+        self.save_every = save_every
+        self.best_loss = np.inf
+
+    def log_epoch(
+        self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient
+    ):
+        self.log["epoch"] = epoch
+        self.log["L2_loss"] = L2_loss.item()
+        self.log["D_loss"] = D_loss.item()
+        self.log["losses"] = losses
+        self.log["model"] = model
+        self.log["optimizer"] = optimizer
+        self.log["pulse"] = pulse
+        self.log["gradient"] = gradient
+        self.save(epoch, losses)
+
+    def save(self, epoch, losses, filename="train_log.pt"):
+        if not epoch % self.save_every == 0:
+            return
+        if not np.mean(losses[-4:]) < self.best_loss:
+            return
+        self.best_loss = np.mean(losses[-4:])
+        torch.save(self.log, filename)
+        print(f"Training log saved to {filename}")
+
+
 class InfoScreen:
     def __init__(self, output_every=1):
         self.t0 = time()
@@ -14,7 +43,7 @@ class InfoScreen:
 
     def init_plots(self):
         self.fig, self.ax = plt.subplots(1, 4, figsize=(15, 4), constrained_layout=True)
-        self.p1 = self.ax[0].plot([0], [1], linewidth=1, label="Target")[0]
+        self.p1 = self.ax[0].plot([0], [1], linewidth=1, label="Target_z")[0]
         self.p2 = self.ax[0].plot([0], [1], linewidth=1, label="M_z")[0]
         self.p3 = self.ax[0].plot([0], [1], linewidth=1, label="M_xy")[0]
         self.p4 = self.ax[0].plot([0], [1], linewidth=0.5, label="Error")[0]
@@ -31,11 +60,12 @@ class InfoScreen:
         self.ax[2].set_title("Loss")
         self.ax[3].set_title("Gradient")
 
-
-    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
+    def plot_info(
+        self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
+    ):
         """plots info curves during training"""
-        fmin = torch.min(fAx).item()
-        fmax = torch.max(fAx).item()
+        fmin = -10  # torch.min(fAx).item()
+        fmax = 10  # torch.max(fAx).item()
         if epoch % self.output_every == 0:
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
@@ -52,15 +82,22 @@ class InfoScreen:
             self.ax[1].set_xlim(t[0], t[-1])
             self.ax[3].set_xlim(t[0], t[-1])
             self.ax[2].set_xlim(0, epoch + 1)
-            self.ax[0].set_ylim(0,1)
+            self.ax[0].set_ylim(-0.1, 1.1)
             self.ax[1].set_ylim(
                 (
-                    -1.1*np.max(np.sqrt(pulse_real**2+pulse_imag**2)),
-                    1.1*np.max(np.sqrt(pulse_real**2+pulse_imag**2))
+                    -1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
+                    1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                 )
             )
-            self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
-            self.ax[3].set_ylim((-1.1 * np.max(np.abs(gradient_plot)).item(), 1.1 * np.max(np.abs(gradient_plot)).item()))
+            self.ax[2].set_ylim(
+                (0.9 * np.min(losses).item(), 1.1 * np.max(losses).item())
+            )
+            self.ax[3].set_ylim(
+                (
+                    -1.1 * np.max(np.abs(gradient_plot)).item(),
+                    1.1 * np.max(np.abs(gradient_plot)).item(),
+                )
+            )
 
             self.p1.set_xdata(fAx)
             self.p2.set_xdata(fAx)
@@ -74,6 +111,7 @@ class InfoScreen:
             self.p5.set_ydata(gradient_plot)
 
             self.q.set_xdata(t)
+            self.qq.set_xdata(t)
             self.q.set_ydata(pulse_real)
             self.qq.set_ydata(pulse_imag)
 
@@ -85,7 +123,7 @@ class InfoScreen:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def print_info(self, epoch, L2_loss,D_Loss):
+    def print_info(self, epoch, L2_loss, D_Loss):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
@@ -97,17 +135,19 @@ class InfoScreen:
 
 def init_training(model_pulse, lr, device=torch.device("cpu")):
     model_pulse = model_pulse.to(device)
-    optimizer_pulse = torch.optim.Adam(model_pulse.parameters(), lr=lr)
+    optimizer_pulse = torch.optim.AdamW(model_pulse.parameters(), lr=lr)
     losses = []
-    best_loss = np.inf
-    saved = False
-    save_timer = 0
-    return model_pulse, optimizer_pulse, losses, best_loss, saved, save_timer
+    return model_pulse, optimizer_pulse, losses
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
-    D_Loss = torch.sqrt(torch.abs(pulse[0])**2 + torch.abs(pulse[-1])**2) + torch.sqrt(gradient[0]**2 + gradient[-1]**2)/gradient_scale
+    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean(
+        (xy_profile_abs - tgt_xy) ** 2
+    )
+    D_Loss = (
+        torch.sqrt(torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2)
+        + torch.sqrt(gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale
+    )
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2)
     return L2_loss, D_Loss  # + H1_loss
