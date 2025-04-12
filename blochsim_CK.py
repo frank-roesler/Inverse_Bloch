@@ -84,7 +84,8 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     # Compute these out of loop
     Phi = dt * gam * torch.sqrt(torch.abs(bxy) ** 2 + bz**2)
     cp = torch.cos(Phi / 2)
-    sinc_part = 1j * gam * dt * 0.5 * (1 - Phi**2 / 24)
+    # sinc_part = 1j * gam * dt * 0.5 * (1 - Phi**2 / 24)
+    sinc_part = 1j * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
     alpha = cp - bz * sinc_part
     beta = -bxy * sinc_part
     alphaBar = torch.conj(alpha)
