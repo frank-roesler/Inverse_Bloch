@@ -29,9 +29,7 @@ class TrainLogger:
         self.save_every = save_every
         self.best_loss = np.inf
 
-    def log_epoch(
-        self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient
-    ):
+    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
@@ -60,30 +58,32 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig, self.ax = plt.subplots(1, 4, figsize=(15, 4), constrained_layout=True)
-        self.p1 = self.ax[0].plot([0], [1], linewidth=1, label="Target_z")[0]
-        self.p2 = self.ax[0].plot([0], [1], linewidth=1, label="M_z")[0]
-        self.p3 = self.ax[0].plot([0], [1], linewidth=1, label="M_xy")[0]
-        self.p4 = self.ax[0].plot([0], [1], linewidth=0.5, label="Error")[0]
-        self.p5 = self.ax[3].plot([0], [1], linewidth=1, label="Gradient")[0]
-        self.q = self.ax[1].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
-        self.qq = self.ax[1].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
-        self.r = self.ax[2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
-        self.ax[0].legend()
-        self.ax[1].legend()
-        self.ax[2].legend()
-        self.ax[3].legend()
-        self.ax[0].set_title("Frequency profile")
-        self.ax[1].set_title("Pulse")
-        self.ax[2].set_title("Loss")
-        self.ax[3].set_title("Gradient")
+        self.fig, self.ax = plt.subplots(2, 3, figsize=(12, 7), constrained_layout=True)
+        self.ax[1, 0].remove()
+        self.ax[1, 1].remove()
+        self.ax[1, 2].remove()
+        self.big_ax = self.fig.add_subplot(2, 1, 2)
+        self.target_z_plot = self.big_ax.plot([0], [1], linewidth=1, label="Target_z")[0]
+        self.mz_plot = self.big_ax.plot([0], [1], linewidth=1, label="M_z")[0]
+        self.mxy_plot = self.big_ax.plot([0], [1], linewidth=1, label="M_xy")[0]
+        self.error_plot = self.big_ax.plot([0], [1], linewidth=0.5, label="Error (z and xy)")[0]
+        self.grad_plot = self.ax[0, 1].plot([0], [1], linewidth=1, label="Gradient")[0]
+        self.pulse_real_plot = self.ax[0, 0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
+        self.pulse_imag_plot = self.ax[0, 0].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
+        self.loss_plot = self.ax[0, 2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
+        self.big_ax.legend()
+        self.ax[0, 0].legend()
+        self.ax[0, 2].legend()
+        self.ax[0, 1].legend()
+        self.big_ax.set_title("Frequency profile")
+        self.ax[0, 0].set_title("Pulse")
+        self.ax[0, 2].set_title("Loss")
+        self.ax[0, 1].set_title("Gradient")
 
-    def plot_info(
-        self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
-    ):
+    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
         """plots info curves during training"""
-        fmin = -10  # torch.min(fAx).item()
-        fmax = 10  # torch.max(fAx).item()
+        fmin = -20  # torch.min(fAx).item()
+        fmax = 20  # torch.max(fAx).item()
         if epoch % self.output_every == 0:
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
@@ -92,49 +92,43 @@ class InfoScreen:
             tgt_xy = target_xy.detach().cpu().numpy()
             pulse_real = np.real(pulse.detach().cpu().numpy())
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
-            gradient_plot = gradient.detach().cpu().numpy()
+            gradient_for_plot = gradient.detach().cpu().numpy()
 
             error = np.sqrt((mz_plot - tgt_z) ** 2 + (mxy_abs - tgt_xy) ** 2)
 
-            self.ax[0].set_xlim(fmin, fmax)
-            self.ax[1].set_xlim(t[0], t[-1])
-            self.ax[3].set_xlim(t[0], t[-1])
-            self.ax[2].set_xlim(0, epoch + 1)
-            self.ax[0].set_ylim(-0.1, 1.1)
-            self.ax[1].set_ylim(
+            self.big_ax.set_xlim(fmin, fmax)
+            self.ax[0, 0].set_xlim(t[0], t[-1])
+            self.ax[0, 1].set_xlim(t[0], t[-1])
+            self.ax[0, 2].set_xlim(0, epoch + 1)
+            self.big_ax.set_ylim(-0.1, 1.1)
+            self.ax[0, 0].set_ylim(
                 (
                     -1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                     1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                 )
             )
-            self.ax[2].set_ylim(
-                (0.9 * np.min(losses).item(), 1.1 * np.max(losses).item())
-            )
-            self.ax[3].set_ylim(
-                (
-                    -1.1 * np.max(np.abs(gradient_plot)).item(),
-                    1.1 * np.max(np.abs(gradient_plot)).item(),
-                )
+            self.ax[0, 2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
+            self.ax[0, 1].set_ylim(
+                (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
             )
 
-            self.p1.set_xdata(fAx)
-            self.p2.set_xdata(fAx)
-            self.p3.set_xdata(fAx)
-            self.p4.set_xdata(fAx)
-            self.p5.set_xdata(t)
-            self.p1.set_ydata(tgt_z)
-            self.p2.set_ydata(mz_plot)
-            self.p3.set_ydata(mxy_abs)
-            self.p4.set_ydata(error)
-            self.p5.set_ydata(gradient_plot)
+            self.target_z_plot.set_xdata(fAx)
+            self.mz_plot.set_xdata(fAx)
+            self.mxy_plot.set_xdata(fAx)
+            self.error_plot.set_xdata(fAx)
+            self.grad_plot.set_xdata(t)
+            self.pulse_real_plot.set_xdata(t)
+            self.pulse_imag_plot.set_xdata(t)
+            self.loss_plot.set_xdata(np.arange(epoch + 1))
 
-            self.q.set_xdata(t)
-            self.qq.set_xdata(t)
-            self.q.set_ydata(pulse_real)
-            self.qq.set_ydata(pulse_imag)
-
-            self.r.set_xdata(np.arange(epoch + 1))
-            self.r.set_ydata(losses)
+            self.target_z_plot.set_ydata(tgt_z)
+            self.mz_plot.set_ydata(mz_plot)
+            self.mxy_plot.set_ydata(mxy_abs)
+            self.error_plot.set_ydata(error)
+            self.grad_plot.set_ydata(gradient_for_plot)
+            self.pulse_real_plot.set_ydata(pulse_real)
+            self.pulse_imag_plot.set_ydata(pulse_imag)
+            self.loss_plot.set_ydata(losses)
 
             self.fig.canvas.draw()
             plt.savefig("results/training.png", dpi=300)
@@ -151,9 +145,7 @@ class InfoScreen:
         print("-" * 100)
 
 
-def pre_train(
-    target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")
-):
+def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")):
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
     model, optimizer, losses = init_training(model, lr=lr, device=device)
@@ -165,15 +157,9 @@ def pre_train(
         epoch += 1
         model_output = model(t_B1)
 
-        loss_pulse_real = torch.mean(
-            (model_output[:, 0:1] - torch.real(target_pulse)) ** 2
-        )
-        loss_pulse_imag = torch.mean(
-            (model_output[:, 1:2] - torch.imag(target_pulse)) ** 2
-        )
-        loss_gradient = torch.mean(
-            (gradient_scale * model_output[:, 2:] - target_gradient) ** 2
-        )
+        loss_pulse_real = torch.mean((model_output[:, 0:1] - torch.real(target_pulse)) ** 2)
+        loss_pulse_imag = torch.mean((model_output[:, 1:2] - torch.imag(target_pulse)) ** 2)
+        loss_gradient = torch.mean((gradient_scale * model_output[:, 2:] - target_gradient) ** 2)
         loss = loss_pulse_real + loss_pulse_imag + loss_gradient / gradient_scale
 
         optimizer.zero_grad()
@@ -203,13 +189,9 @@ def init_training(model, lr, device=torch.device("cpu")):
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean(
-        (xy_profile_abs - tgt_xy) ** 2
-    )
+    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
-    D_Loss = (
-        boundary_vals_pulse + boundary_vals_grad / gradient_scale**2
-    )  # Dirichlet loss
+    D_Loss = boundary_vals_pulse + boundary_vals_grad / gradient_scale**2  # Dirichlet loss
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
     return L2_loss, D_Loss  # + H1_loss
