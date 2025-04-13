@@ -29,7 +29,9 @@ class TrainLogger:
         self.save_every = save_every
         self.best_loss = np.inf
 
-    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient):
+    def log_epoch(
+        self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient
+    ):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
@@ -76,7 +78,9 @@ class InfoScreen:
         self.ax[2].set_title("Loss")
         self.ax[3].set_title("Gradient")
 
-    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
+    def plot_info(
+        self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
+    ):
         """plots info curves during training"""
         fmin = -10  # torch.min(fAx).item()
         fmax = 10  # torch.max(fAx).item()
@@ -103,9 +107,14 @@ class InfoScreen:
                     1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                 )
             )
-            self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
+            self.ax[2].set_ylim(
+                (0.9 * np.min(losses).item(), 1.1 * np.max(losses).item())
+            )
             self.ax[3].set_ylim(
-                (-1.1 * np.max(np.abs(gradient_plot)).item(), 1.1 * np.max(np.abs(gradient_plot)).item())
+                (
+                    -1.1 * np.max(np.abs(gradient_plot)).item(),
+                    1.1 * np.max(np.abs(gradient_plot)).item(),
+                )
             )
 
             self.p1.set_xdata(fAx)
@@ -142,20 +151,29 @@ class InfoScreen:
         print("-" * 100)
 
 
-def pre_train(target_pulse, target_gradient, model, lr=1e-4, device=torch.device("cpu")):
+def pre_train(
+    target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")
+):
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
     model, optimizer, losses = init_training(model, lr=lr, device=device)
-    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
+    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
+    t_B1 = t_B1.to(device)
     loss = torch.inf
     epoch = 0
-    while loss > 1e-4:
+    while loss > thr:
         epoch += 1
         model_output = model(t_B1)
 
-        loss_pulse_real = torch.mean((model_output[:, 0:1] - torch.real(target_pulse)) ** 2)
-        loss_pulse_imag = torch.mean((model_output[:, 1:2] - torch.imag(target_pulse)) ** 2)
-        loss_gradient = torch.mean((gradient_scale * model_output[:, 2:] - target_gradient) ** 2)
+        loss_pulse_real = torch.mean(
+            (model_output[:, 0:1] - torch.real(target_pulse)) ** 2
+        )
+        loss_pulse_imag = torch.mean(
+            (model_output[:, 1:2] - torch.imag(target_pulse)) ** 2
+        )
+        loss_gradient = torch.mean(
+            (gradient_scale * model_output[:, 2:] - target_gradient) ** 2
+        )
         loss = loss_pulse_real + loss_pulse_imag + loss_gradient / gradient_scale
 
         optimizer.zero_grad()
@@ -185,9 +203,13 @@ def init_training(model, lr, device=torch.device("cpu")):
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
+    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean(
+        (xy_profile_abs - tgt_xy) ** 2
+    )
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
-    D_Loss = boundary_vals_pulse + boundary_vals_grad / gradient_scale**2  # Dirichlet loss
+    D_Loss = (
+        boundary_vals_pulse + boundary_vals_grad / gradient_scale**2
+    )  # Dirichlet loss
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
     return L2_loss, D_Loss  # + H1_loss

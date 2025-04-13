@@ -4,19 +4,40 @@ from utils_bloch.blochsim_CK import blochsim_CK
 from params import *
 
 device = get_device()
-_, _, target_z, target_xy = get_test_targets()
+target_z, target_xy, _, _ = get_test_targets()
 B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
 )
 
 # model = MLP(output_dim=3, hidden_dim=64, num_layers=8).float()
-model = FourierSeries(n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
+model = FourierSeries(
+    n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()
+).float()
 model, optimizer, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:
-    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
-    G = torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False).to(device)
-    model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr=1e-4, device=device)
+    B1 = (
+        torch.from_numpy(inputs["rfmb"])
+        .to(torch.complex64)
+        .detach()
+        .requires_grad_(False)
+        .to(device)
+    )
+    G = (
+        torch.from_numpy(inputs["Gs"])
+        .to(torch.float32)
+        .detach()
+        .requires_grad_(False)
+        .to(device)
+    )
+    model = pre_train(
+        target_pulse=B1,
+        target_gradient=G,
+        model=model,
+        lr=1e-4,
+        thr=0.0006,
+        device=device,
+    )
 
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
 trainLogger = TrainLogger(save_every=logging_frequency)
@@ -34,6 +55,10 @@ for epoch in range(epochs + 1):
     loss.backward()
     optimizer.step()
 
-    infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(
+        epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient
+    )
     infoscreen.print_info(epoch, L2Loss, DLoss)
-    trainLogger.log_epoch(epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient)
+    trainLogger.log_epoch(
+        epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient
+    )
