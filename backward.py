@@ -1,39 +1,23 @@
 from utils_train.nets import *
-from blochsim_CK import blochsim_CK
-from params import *
 from utils_train.utils import *
+from utils_bloch.blochsim_CK import blochsim_CK
+from params import *
 
+device = get_device()
+_, _, target_z, target_xy = get_test_targets()
+move_to((B0, sens, t_B1, inputs["pos"], target_z, target_xy), device)
 
-device = (
-    torch.device("mps")
-    if torch.backends.mps.is_available()
-    else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-)
-print("Device:", device)
-
-inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
-
-sens = sens.detach().requires_grad_(False)
-B0 = B0.detach().requires_grad_(False)
-tAx = tAx.detach().requires_grad_(False)
-fAx = fAx.detach().requires_grad_(False)
-t_B1 = t_B1.detach().requires_grad_(False)
-
-target_z, target_xy = get_targets()
-target_z = target_z.to(device)
-target_xy = target_xy.to(device)
-targets_z = target_z.detach().requires_grad_(False)
-target_xy = target_xy.detach().requires_grad_(False)
-
-model = FourierMLP(output_dim=3, hidden_dim=64, num_layers=3).float()
+# model = MLP(output_dim=3, hidden_dim=64, num_layers=8).float()
+model = FourierSeries(n_coeffs=11, output_dim=3, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
 model, optimizer, losses = init_training(model, lr, device=device)
 
-B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
-G = torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False).to(device)
-model = pre_train(target_pulse=B1, target_gradient=G, model=model)
+if pre_train_inputs:
+    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
+    G = torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False).to(device)
+    model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr=1e-4, device=device)
 
-infoscreen = InfoScreen(output_every=1)
-trainLogger = TrainLogger(save_every=10)
+infoscreen = InfoScreen(output_every=plot_loss_frequency)
+trainLogger = TrainLogger(save_every=logging_frequency)
 for epoch in range(epochs + 1):
     pulse_gradient = model(t_B1)
     pulse = pulse_gradient[:, 0:1] + 1j * pulse_gradient[:, 1:2]
@@ -41,7 +25,7 @@ for epoch in range(epochs + 1):
 
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
     L2Loss, DLoss = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-    loss = L2Loss + DLoss
+    loss = L2Loss + DLoss  # DLoss can be omitted when training FourierSeries
 
     losses.append(loss.item())
     optimizer.zero_grad()

@@ -1,4 +1,4 @@
-from blochsim_CK import blochsim_CK
+from utils_bloch.blochsim_CK import blochsim_CK
 import numpy as np
 from params import *
 import matplotlib.pyplot as plt

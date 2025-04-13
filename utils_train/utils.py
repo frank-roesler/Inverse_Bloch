@@ -5,6 +5,25 @@ import numpy as np
 from params import gradient_scale, get_fixed_inputs
 
 
+def get_device():
+    device = (
+        torch.device("cpu")
+        if torch.backends.mps.is_available()
+        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
+    print("Device:", device)
+    return device
+
+
+def move_to(*tensor_list, device=torch.device("cpu")):
+    for tensor in tensor_list:
+        if isinstance(tensor, torch.Tensor):
+            tensor = tensor.to(device)
+        else:
+            raise ValueError("Expected a torch.Tensor")
+    return tensor_list
+
+
 class TrainLogger:
     def __init__(self, save_every=1):
         self.log = {}
@@ -118,25 +137,20 @@ class InfoScreen:
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"L2 Loss: {L2_loss.item():.3f}")
-        print(f"D Loss: {D_Loss.item():.3f}")
+        print(f"L2 Loss: {L2_loss.item():.4f}")
+        print(f"D Loss: {D_Loss.item():.4f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
 
 
-def pre_train(target_pulse, target_gradient, model):
-    device = (
-        torch.device("mps")
-        if torch.backends.mps.is_available()
-        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    )
+def pre_train(target_pulse, target_gradient, model, lr=1e-4, device=torch.device("cpu")):
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
-    model, optimizer, losses = init_training(model, lr=2e-5, device=device)
+    model, optimizer, losses = init_training(model, lr=lr, device=device)
     inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
     loss = torch.inf
     epoch = 0
-    while loss > 3e-5:
+    while loss > 1e-4:
         epoch += 1
         model_output = model(t_B1)
 
@@ -148,7 +162,7 @@ def pre_train(target_pulse, target_gradient, model):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if epoch % 100 == 0:
+        if epoch % 1000 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item():.6f}")
     plt.figure()
     plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
@@ -165,7 +179,7 @@ def pre_train(target_pulse, target_gradient, model):
 def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     losses = []
     return model, optimizer, losses
 
@@ -173,10 +187,8 @@ def init_training(model, lr, device=torch.device("cpu")):
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
     L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
-    D_Loss = (
-        torch.abs(pulse[0]) ** 2
-        + torch.abs(pulse[-1]) ** 2
-        + (gradient[0] ** 2 + gradient[-1] ** 2) / gradient_scale**2
-    )
-    # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2)
-    return L2_loss, 10 * D_Loss  # + H1_loss
+    boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
+    boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
+    D_Loss = boundary_vals_pulse + boundary_vals_grad / gradient_scale**2  # Dirichlet loss
+    # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
+    return L2_loss, D_Loss  # + H1_loss
