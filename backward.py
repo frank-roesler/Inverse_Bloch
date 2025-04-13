@@ -5,10 +5,12 @@ from params import *
 
 device = get_device()
 _, _, target_z, target_xy = get_test_targets()
-move_to((B0, sens, t_B1, inputs["pos"], target_z, target_xy), device)
+B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
+    (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
+)
 
 # model = MLP(output_dim=3, hidden_dim=64, num_layers=8).float()
-model = FourierSeries(n_coeffs=11, output_dim=3, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
+model = FourierSeries(n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
 model, optimizer, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:

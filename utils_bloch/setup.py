@@ -29,7 +29,7 @@ def get_fixed_inputs():
 
 
 def get_test_targets():
-    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch)
+    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
     G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
     B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
     mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)

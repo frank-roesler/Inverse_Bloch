@@ -7,7 +7,7 @@ from params import gradient_scale, get_fixed_inputs
 
 def get_device():
     device = (
-        torch.device("cpu")
+        torch.device("mps")
         if torch.backends.mps.is_available()
         else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     )
@@ -15,13 +15,12 @@ def get_device():
     return device
 
 
-def move_to(*tensor_list, device=torch.device("cpu")):
+def move_to(tensor_list, device=torch.device("cpu")):
+    out_list = []
     for tensor in tensor_list:
-        if isinstance(tensor, torch.Tensor):
-            tensor = tensor.to(device)
-        else:
-            raise ValueError("Expected a torch.Tensor")
-    return tensor_list
+        tensor = tensor.to(device)
+        out_list.append(tensor)
+    return out_list
 
 
 class TrainLogger:

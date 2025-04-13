@@ -10,4 +10,21 @@ logging_frequency = 10  # save every n epochs
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
 # BLOCH PARAMETERS:
-inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs(module=torch, device=device)
+inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
+
+# MODEL PARAMETERS:
+# Fourier Series:
+n_coeffs = 21
+
+# SIREN:
+omega_0 = 6
+
+# MLP, SIREN:
+hidden_dim = 64
+num_layers = 8
+
+# RBFN:
+num_centers = 10
+
+# FourierMLP:
+num_fourier_features = 21
