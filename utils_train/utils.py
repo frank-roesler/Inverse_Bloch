@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from params import gradient_scale, get_fixed_inputs
+import os
 
 
 def get_device():
@@ -41,11 +42,14 @@ class TrainLogger:
         self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
+        if epoch == 0:
+            return
         if not epoch % self.save_every == 0:
             return
         if not np.mean(losses[-4:]) < self.best_loss:
             return
         self.best_loss = np.mean(losses[-4:])
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
 
@@ -58,7 +62,7 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig, self.ax = plt.subplots(2, 3, figsize=(12, 7), constrained_layout=True)
+        self.fig, self.ax = plt.subplots(2, 3, figsize=(12, 7), constrained_layout=False)
         self.ax[1, 0].remove()
         self.ax[1, 1].remove()
         self.ax[1, 2].remove()
@@ -131,7 +135,9 @@ class InfoScreen:
             self.loss_plot.set_ydata(losses)
 
             self.fig.canvas.draw()
-            plt.savefig("results/training.png", dpi=300)
+            filename = "results/training.png"
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            plt.savefig(filename, dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 
@@ -167,15 +173,15 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
         optimizer.step()
         if epoch % 1000 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item():.6f}")
-    plt.figure()
-    plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
-    plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
-    plt.figure()
-    plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
-    plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
-    plt.figure()
-    plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
-    plt.show()
+    # plt.figure()
+    # plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
+    # plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
+    # plt.figure()
+    # plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
+    # plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
+    # plt.figure()
+    # plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
+    # plt.show()
     return model
 
 
