@@ -58,7 +58,9 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     dt = kwargs.get("dt", 6.4e-6)
 
     # Handle M0 initialization
-    M0 = kwargs.get("M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False))
+    M0 = kwargs.get(
+        "M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False)
+    )
     if M0.ndim == 1:
         M0 = M0.to(B1.device)
 
@@ -67,8 +69,12 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     Nt = G.shape[0]  # Number of time points
 
     # Initialize state variables
-    statea = torch.ones(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
-    stateb = torch.zeros(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
+    statea = torch.ones(
+        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
+    )
+    stateb = torch.zeros(
+        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
+    )
 
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)
@@ -83,9 +89,10 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
     # Compute these out of loop
     normSquared = torch.abs(bxy) ** 2 + bz**2
-    N = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
-    N[normSquared > 0] = torch.sqrt(normSquared[normSquared > 0])
-    Phi = dt * gam * N
+    Phi = torch.zeros(
+        normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False
+    )
+    Phi[normSquared > 0] = dt * gam * torch.sqrt(normSquared[normSquared > 0])
     cp = torch.cos(Phi / 2)
     if B1.device == torch.device("mps:0"):
         sinc_part = 1j * gam * dt * 0.5 * (1 - Phi**2 / 24 + Phi**4 / 1920)
@@ -119,7 +126,11 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    mxy = 2 * mz0 * torch.conj(statea) * stateb + mxy0 * torch.conj(statea) ** 2 - torch.conj(mxy0) * stateb**2
+    mxy = (
+        2 * mz0 * torch.conj(statea) * stateb
+        + mxy0 * torch.conj(statea) ** 2
+        - torch.conj(mxy0) * stateb**2
+    )
     mz = mz0 * (statea * torch.conj(statea) - stateb * torch.conj(stateb))
     mz = mz + 2 * torch.real(mxy0 * torch.conj(statea) * (-torch.conj(stateb)))
 
