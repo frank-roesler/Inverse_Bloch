@@ -1,5 +1,6 @@
 from time import time
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import torch
 import numpy as np
 from params import gradient_scale, get_fixed_inputs
@@ -62,27 +63,47 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig, self.ax = plt.subplots(2, 3, figsize=(12, 7), constrained_layout=False)
-        self.ax[1, 0].remove()
-        self.ax[1, 1].remove()
-        self.ax[1, 2].remove()
-        self.big_ax = self.fig.add_subplot(2, 1, 2)
-        self.target_z_plot = self.big_ax.plot([0], [1], linewidth=1, label="Target_z")[0]
-        self.mz_plot = self.big_ax.plot([0], [1], linewidth=1, label="M_z")[0]
-        self.mxy_plot = self.big_ax.plot([0], [1], linewidth=1, label="M_xy")[0]
-        self.error_plot = self.big_ax.plot([0], [1], linewidth=0.5, label="Error (z and xy)")[0]
-        self.grad_plot = self.ax[0, 1].plot([0], [1], linewidth=1, label="Gradient")[0]
-        self.pulse_real_plot = self.ax[0, 0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
-        self.pulse_imag_plot = self.ax[0, 0].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
-        self.loss_plot = self.ax[0, 2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
-        self.big_ax.legend()
-        self.ax[0, 0].legend()
-        self.ax[0, 2].legend()
-        self.ax[0, 1].legend()
-        self.big_ax.set_title("Frequency profile")
-        self.ax[0, 0].set_title("Pulse")
-        self.ax[0, 2].set_title("Loss")
-        self.ax[0, 1].set_title("Gradient")
+        import matplotlib.gridspec as gridspec  # Add this import if not already present
+
+    def init_plots(self):
+        self.fig = plt.figure(figsize=(12, 7), constrained_layout=False)
+        spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
+
+        # First row: 3 plots spanning the entire width
+        spec_top = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=spec[0, :])  # Split first row into 3 columns
+        self.ax = [None] * 3
+        self.ax[0] = self.fig.add_subplot(spec_top[0])  # First column
+        self.ax[1] = self.fig.add_subplot(spec_top[1])  # Second column
+        self.ax[2] = self.fig.add_subplot(spec_top[2])  # Third column
+
+        # Second row: 2 equally wide plots
+        self.ax_bottom_left = self.fig.add_subplot(spec[1, 0])  # Left plot
+        self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])  # Right plot
+
+        # Initialize plots for the first row
+        self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
+        self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
+        self.grad_plot = self.ax[1].plot([0], [1], linewidth=1, label="Gradient")[0]
+        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
+
+        # Initialize plots for the second row
+        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="Target_z")[0]
+        self.mz_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="M_z")[0]
+        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Target_xy")[0]
+        self.mxy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="M_xy")[0]
+        # self.error_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.5, label="Error (z and xy)")[0]
+
+        # Set titles and legends
+        self.ax[0].set_title("Pulse")
+        self.ax[1].set_title("Gradient")
+        self.ax[2].set_title("Loss")
+        self.ax_bottom_left.set_title("Frequency Profile")
+        self.ax_bottom_right.set_title("M_xy")
+        self.ax[0].legend()
+        self.ax[1].legend()
+        self.ax[2].legend()
+        self.ax_bottom_left.legend()
+        self.ax_bottom_right.legend()
 
     def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
         """plots info curves during training"""
@@ -98,37 +119,41 @@ class InfoScreen:
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
             gradient_for_plot = gradient.detach().cpu().numpy()
 
-            error = np.sqrt((mz_plot - tgt_z) ** 2 + (mxy_abs - tgt_xy) ** 2)
+            # error = np.sqrt((mz_plot - tgt_z) ** 2 + (mxy_abs - tgt_xy) ** 2)
 
-            self.big_ax.set_xlim(fmin, fmax)
-            self.ax[0, 0].set_xlim(t[0], t[-1])
-            self.ax[0, 1].set_xlim(t[0], t[-1])
-            self.ax[0, 2].set_xlim(0, epoch + 1)
-            self.big_ax.set_ylim(-0.1, 1.1)
-            self.ax[0, 0].set_ylim(
+            self.ax_bottom_left.set_xlim(fmin, fmax)
+            self.ax_bottom_right.set_xlim(fmin, fmax)
+            self.ax[0].set_xlim(t[0], t[-1])
+            self.ax[1].set_xlim(t[0], t[-1])
+            self.ax[2].set_xlim(0, epoch + 1)
+            self.ax_bottom_left.set_ylim(-0.1, 1.1)
+            self.ax_bottom_right.set_ylim(-0.1, 1.1)
+            self.ax[0].set_ylim(
                 (
                     -1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                     1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
                 )
             )
-            self.ax[0, 2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
-            self.ax[0, 1].set_ylim(
+            self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
+            self.ax[1].set_ylim(
                 (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
             )
 
             self.target_z_plot.set_xdata(fAx)
+            self.target_xy_plot.set_xdata(fAx)
             self.mz_plot.set_xdata(fAx)
             self.mxy_plot.set_xdata(fAx)
-            self.error_plot.set_xdata(fAx)
+            # self.error_plot.set_xdata(fAx)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
             self.loss_plot.set_xdata(np.arange(epoch + 1))
 
             self.target_z_plot.set_ydata(tgt_z)
+            self.target_xy_plot.set_ydata(tgt_xy)
             self.mz_plot.set_ydata(mz_plot)
             self.mxy_plot.set_ydata(mxy_abs)
-            self.error_plot.set_ydata(error)
+            # self.error_plot.set_ydata(error)
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
             self.pulse_imag_plot.set_ydata(pulse_imag)

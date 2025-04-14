@@ -2,6 +2,7 @@ import scipy
 import torch
 import numpy as np
 from utils_bloch.blochsim_CK import blochsim_CK
+from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
@@ -45,3 +46,15 @@ def get_test_targets():
     mz = mz.detach().requires_grad_(False)
     mxy_abs = mxy_abs.detach().requires_grad_(False)
     return (target_z, target_xy, mz, mxy_abs)
+
+
+def get_smooth_targets(smoothness=1):
+    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
+    G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
+    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
+    mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
+    targAbsMxy, targPhMxy, targMz = buildTarget(mxy, mz, B1, dt, bwTB=1.8, sharpnessTB=smoothness, phSlopReduction=1)
+    targAbsMxy = torch.from_numpy(targAbsMxy).to(torch.float32).requires_grad_(False)
+    targPhMxy = torch.from_numpy(targPhMxy).to(torch.float32).requires_grad_(False)
+    targMz = torch.from_numpy(targMz).to(torch.float32).requires_grad_(False)
+    return (targAbsMxy, targPhMxy, targMz)

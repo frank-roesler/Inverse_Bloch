@@ -16,6 +16,17 @@ from typing import Tuple, Union, List, Optional, Any, Dict
 G3 = lambda Gz: torch.column_stack((0 * Gz.flatten(), 0 * Gz.flatten(), Gz.flatten()))
 
 
+def my_sinc(x):
+    if x.device != torch.device("mps:0"):
+        return torch.sinc(x / np.pi)
+    large_x = torch.abs(x) > 1e-2
+    small_x = ~large_x
+    result = torch.zeros_like(x, dtype=torch.float32, device=x.device)
+    result[small_x] = 1 - x[small_x] ** 2 / 6 + x[small_x] ** 4 / 120 + x[small_x] ** 6 / 5040
+    result[large_x] = torch.sin(x[large_x]) / x[large_x]
+    return result
+
+
 def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     """
     Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
@@ -58,9 +69,7 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     dt = kwargs.get("dt", 6.4e-6)
 
     # Handle M0 initialization
-    M0 = kwargs.get(
-        "M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False)
-    )
+    M0 = kwargs.get("M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False))
     if M0.ndim == 1:
         M0 = M0.to(B1.device)
 
@@ -69,12 +78,8 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     Nt = G.shape[0]  # Number of time points
 
     # Initialize state variables
-    statea = torch.ones(
-        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
-    )
-    stateb = torch.zeros(
-        Ns, dtype=torch.complex64, device=B1.device, requires_grad=False
-    )
+    statea = torch.ones(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
+    stateb = torch.zeros(Ns, dtype=torch.complex64, device=B1.device, requires_grad=False)
 
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)
@@ -89,16 +94,10 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
 
     # Compute these out of loop
     normSquared = torch.abs(bxy) ** 2 + bz**2
-    Phi = torch.zeros(
-        normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False
-    )
+    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
     Phi[normSquared > 0] = dt * gam * torch.sqrt(normSquared[normSquared > 0])
-    cp = torch.cos(Phi / 2)
-    if B1.device == torch.device("mps:0"):
-        sinc_part = 1j * gam * dt * 0.5 * (1 - Phi**2 / 24 + Phi**4 / 1920)
-    else:
-        sinc_part = 1j * gam * dt * 0.5 * torch.sinc(Phi / (2 * np.pi))
-    alpha = cp - bz * sinc_part
+    sinc_part = 1j * gam * dt * 0.5 * my_sinc(Phi / 2)
+    alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy * sinc_part
     alphaBar = torch.conj(alpha)
     betaBar = torch.conj(beta)
@@ -126,11 +125,7 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    mxy = (
-        2 * mz0 * torch.conj(statea) * stateb
-        + mxy0 * torch.conj(statea) ** 2
-        - torch.conj(mxy0) * stateb**2
-    )
+    mxy = 2 * mz0 * torch.conj(statea) * stateb + mxy0 * torch.conj(statea) ** 2 - torch.conj(mxy0) * stateb**2
     mz = mz0 * (statea * torch.conj(statea) - stateb * torch.conj(stateb))
     mz = mz + 2 * torch.real(mxy0 * torch.conj(statea) * (-torch.conj(stateb)))
 
