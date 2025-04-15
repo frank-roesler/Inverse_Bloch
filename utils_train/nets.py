@@ -6,15 +6,16 @@ class FourierPulse(nn.Module):
     def __init__(self, length=101, tmin=0, tmax=1):
         super().__init__()
         self.tpulse = tmax - tmin
-        p = 1e-2 * torch.randn(length)
+        p = 1e-2 * torch.randn((length, 2))
         weights = torch.exp(-0.1 * torch.abs(torch.arange(0, length)))
-        p = p * weights
+        p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
         self.k = torch.arange(length, requires_grad=False).unsqueeze(0)
 
     def forward(self, x):
-        y_sin = torch.sum(self.params * torch.sin(torch.pi * self.k * x / self.tpulse), dim=-1, keepdim=True)
-        return y_sin
+        y_sin = torch.sum(self.params[:, 0] * torch.sin(torch.pi * self.k * x / self.tpulse), dim=-1, keepdim=True)
+        y_cos = torch.sum(self.params[:, 1] * torch.cos(torch.pi * self.k * x / self.tpulse), dim=-1, keepdim=True)
+        return y_sin + y_cos
 
     def to(self, device):
         self.k = self.k.to(device)
@@ -37,8 +38,10 @@ class FourierSeries(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=1, num_layers=3):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, tmin=0, tmax=1):
         super(MLP, self).__init__()
+        self.tmin = tmin
+        self.tmax = tmax
         layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
         for _ in range(num_layers - 1):
             layers += [nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
@@ -54,6 +57,8 @@ class MLP(nn.Module):
 
     def forward(self, x):
         output = self.model(x)
+        scaling = (x - self.tmin) * (self.tmax - x)
+        output[0:2] = output[0:2] * scaling  # boundary values of pulse are 0, but not of gradient
         return output
 
 

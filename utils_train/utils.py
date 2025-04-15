@@ -43,11 +43,11 @@ class TrainLogger:
         self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if epoch == 0:
+        if epoch <= 100:
             return
         if not epoch % self.save_every == 0:
             return
-        if not np.mean(losses[-4:]) < self.best_loss:
+        if not losses[-1] < self.best_loss:
             return
         self.best_loss = np.mean(losses[-4:])
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -97,7 +97,7 @@ class InfoScreen:
         self.ax[0].set_title("Pulse")
         self.ax[1].set_title("Gradient")
         self.ax[2].set_title("Loss")
-        self.ax_bottom_left.set_title("Frequency Profile")
+        self.ax_bottom_left.set_title("M_z")
         self.ax_bottom_right.set_title("M_xy")
         self.ax[0].legend()
         self.ax[1].legend()
@@ -166,12 +166,13 @@ class InfoScreen:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def print_info(self, epoch, L2_loss, D_Loss):
+    def print_info(self, epoch, L2_loss, D_Loss, lr):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"L2 Loss: {L2_loss.item():.4f}")
-        print(f"D Loss: {D_Loss.item():.4f}")
+        print(f"L2 Loss: {L2_loss.item():.5f}")
+        print(f"D Loss: {D_Loss.item():.5f}")
+        print(f"learning rate: {lr:.5f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
 
@@ -213,9 +214,12 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
 def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=100, verbose=True
+    )
     losses = []
-    return model, optimizer, losses
+    return model, optimizer, scheduler, losses
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
@@ -223,6 +227,5 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
-    D_Loss = boundary_vals_pulse + boundary_vals_grad / gradient_scale**2  # Dirichlet loss
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
-    return L2_loss, D_Loss  # + H1_loss
+    return (L2_loss, boundary_vals_pulse, boundary_vals_grad / gradient_scale**2)  # + H1_loss

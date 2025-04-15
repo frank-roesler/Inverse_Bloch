@@ -11,9 +11,11 @@ B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
 )
 
-# model = MLP(output_dim=3, hidden_dim=64, num_layers=8).float()
-model = FourierSeries(n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
-model, optimizer, losses = init_training(model, lr, device=device)
+model = MLP(hidden_dim=hidden_dim, num_layers=num_layers, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
+# model = FourierSeries(
+#     n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()
+# ).float()
+model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:
     B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
@@ -28,14 +30,16 @@ for epoch in range(epochs + 1):
     gradient = gradient_scale * pulse_gradient[:, 2:]
 
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
-    L2Loss, DLoss = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-    loss = L2Loss + DLoss  # DLoss can be omitted when training FourierSeries
+
+    L2_loss, boundary_vals_pulse, boundary_vals_grad = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
+    loss = L2_loss, boundary_vals_pulse  # + boundary_vals_grad
 
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    scheduler.step(loss.item())
 
     infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.print_info(epoch, L2Loss, DLoss)
-    trainLogger.log_epoch(epoch, L2Loss, DLoss, losses, model, optimizer, pulse, gradient)
+    infoscreen.print_info(epoch, L2_loss, boundary_vals_pulse, lr)
+    trainLogger.log_epoch(epoch, L2_loss, boundary_vals_pulse, losses, model, optimizer, pulse, gradient)
