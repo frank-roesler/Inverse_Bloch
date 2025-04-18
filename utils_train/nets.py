@@ -3,6 +3,8 @@ import torch
 
 
 class FourierPulse(nn.Module):
+    """Auxiliary 1d Fourier series. Used in FourierSeries class."""
+
     def __init__(self, length=101, tmin=0, tmax=1):
         super().__init__()
         self.tpulse = tmax - tmin
@@ -79,18 +81,21 @@ class SIREN(nn.Module):
 
 
 class RBFN(nn.Module):
-    def __init__(self, num_centers=10, output_dim=1):
+    def __init__(self, num_centers=10, center_spacing=1, output_dim=3, tmin=0, tmax=1):
         super(RBFN, self).__init__()
-        self.centers = nn.Parameter(torch.randn(num_centers, 1))
+        self.centers = nn.Parameter(center_spacing * torch.randn(num_centers, 1))
         self.linear = nn.Linear(num_centers, output_dim)
+        self.tmin = tmin
+        self.tmax = tmax
 
     def forward(self, x):
-        rbf = torch.exp(-torch.cdist(x, self.centers) ** 2)
-        return self.linear(rbf)
+        rbf = torch.exp(-2 * torch.cdist(x, self.centers) ** 2)
+        rbf = self.linear(rbf) * (x - self.tmin) * (self.tmax - x)
+        return rbf
 
 
 class FourierMLP(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=1, num_layers=3, num_fourier_features=10):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10):
         super(FourierMLP, self).__init__()
         self.fourier_weights = nn.Parameter(torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]

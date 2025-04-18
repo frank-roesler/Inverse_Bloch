@@ -9,7 +9,7 @@ import os
 
 def get_device():
     device = (
-        torch.device("mps")
+        torch.device("cpu")
         if torch.backends.mps.is_available()
         else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     )
@@ -43,13 +43,13 @@ class TrainLogger:
         self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if epoch <= 100:
+        if epoch <= 1000:
             return
         if not epoch % self.save_every == 0:
             return
-        if not losses[-1] < self.best_loss:
+        if not losses[-1] < 0.99 * self.best_loss:
             return
-        self.best_loss = np.mean(losses[-4:])
+        self.best_loss = np.mean(losses[-1])
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
@@ -215,9 +215,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=100, verbose=True
-    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, verbose=True)
     losses = []
     return model, optimizer, scheduler, losses
 

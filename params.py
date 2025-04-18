@@ -3,9 +3,9 @@ from utils_bloch.setup import *
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = 1e-3
+lr = 2e-3
 gradient_scale = 200.0  # relative size of gradient to RF pulse
-plot_loss_frequency = 20  # plot every n epochs
+plot_loss_frequency = 10  # plot every n epochs
 logging_frequency = 1  # save every n epochs
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
@@ -24,7 +24,8 @@ hidden_dim = 128
 num_layers = 16
 
 # RBFN:
-num_centers = 10
+num_centers = 1000
+csnter_spacing = 100
 
 # FourierMLP:
 num_fourier_features = 21
