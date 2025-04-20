@@ -29,10 +29,7 @@ infoscreen = InfoScreen(output_every=plot_loss_frequency)
 trainLogger = TrainLogger(save_every=logging_frequency)
 
 for epoch in range(epochs + 1):
-    pulse_gradient = model(t_B1)
-    pulse = pulse_gradient[:, 0:1] + 1j * pulse_gradient[:, 1:2]
-    gradient = gradient_scale * pulse_gradient[:, 2:]
-
+    pulse, gradient = model(t_B1)
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
 
     L2_loss, boundary_vals_pulse, boundary_vals_grad = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
@@ -56,6 +53,6 @@ for epoch in range(epochs + 1):
         pulse,
         gradient,
         inputs,
-        (target_z, target_xy),
-        (tAx, fAx, t_B1),
+        {"target_z": target_z, "target_xy": target_xy},
+        {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )

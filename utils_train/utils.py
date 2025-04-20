@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from params import gradient_scale, get_fixed_inputs
 import os
+import json
 
 
 class TrainLogger:
@@ -38,6 +39,29 @@ class TrainLogger:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
+    
+    def export_json(self, directory="results"):
+        export_path = os.path.join(directory, f"sms_nn_{self.log["model"].name}.json")
+        dur = 1000 * self.log["t_B1"][-1].item()
+
+        data = {  "id": "sms_nn_150425_MLP_square2",
+                "set": {
+                    "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
+                    "dur": dur,
+                    "pts": len(self.log["t_B1"]),
+                    "amplInt": None,
+                    "refocFract": None
+                },
+                "conf": {
+                    "slthick": 0.02,
+                    "bs": 1.5,
+                    "tb": 4.8,
+                    "mb": 2
+                },
+                "rfPls": {"real": torch.real(self.log["pulse"]).tolist(),
+                          "imag": torch.imag(self.log["pulse"]).tolist(),}}
+        with open(export_path, "w") as json_file:
+            json.dump(data, json_file, indent=4)
 
 
 class InfoScreen:
@@ -234,7 +258,7 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
 
 
 def load_data(path):
-    data_dict = torch.load(path, weights_only=False)
+    data_dict = torch.load(path, weights_only=False, map_location="cpu")
     # epoch = data_dict["epoch"]
     # L2_loss = data_dict["L2_loss"]
     # D_loss = data_dict["D_loss"]

@@ -15,7 +15,7 @@ def get_fixed_inputs():
     sens = torch.ones((Nz, 1), dtype=torch.complex64)
     B0 = torch.zeros((Nz, 1))
     tAx = torch.linspace(0, (len(inputs["rfmb"]) - 1) * dt, Nz)
-    bw = (1.0 / max(tAx)) * len(tAx)
+    bw = torch.len(tAx) / torch.max(tAx)
     fAx = torch.linspace(-bw, bw, len(tAx)) * 1e-6 * 2 * torch.pi
     t_B1 = torch.arange(0, len(inputs["rfmb"])) * dt * 1e3
     tAx = tAx.float()
