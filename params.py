@@ -17,15 +17,16 @@ inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
 n_coeffs = 20
 
 # SIREN:
-omega_0 = 6
+omega_0 = 2.5
 
 # MLP, SIREN:
-hidden_dim = 128
-num_layers = 16
+hidden_dim = 256
+num_layers = 32
 
 # RBFN:
-num_centers = 1000
-csnter_spacing = 100
+num_centers = 10
+center_spacing = 1
 
 # FourierMLP:
-num_fourier_features = 21
+num_fourier_features = 101
+frequency_scale = 500

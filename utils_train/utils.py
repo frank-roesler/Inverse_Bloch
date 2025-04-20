@@ -7,39 +7,24 @@ from params import gradient_scale, get_fixed_inputs
 import os
 
 
-def get_device():
-    device = (
-        torch.device("cpu")
-        if torch.backends.mps.is_available()
-        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    )
-    print("Device:", device)
-    return device
-
-
-def move_to(tensor_list, device=torch.device("cpu")):
-    out_list = []
-    for tensor in tensor_list:
-        tensor = tensor.to(device)
-        out_list.append(tensor)
-    return out_list
-
-
 class TrainLogger:
     def __init__(self, save_every=1):
         self.log = {}
         self.save_every = save_every
         self.best_loss = np.inf
 
-    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient):
+    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, inputs, targets, axes):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
+        self.log["inputs"] = inputs
+        self.log["targets"] = targets
         self.log["pulse"] = pulse
         self.log["gradient"] = gradient
+        self.log["axes"] = axes
         self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
@@ -47,9 +32,9 @@ class TrainLogger:
             return
         if not epoch % self.save_every == 0:
             return
-        if not losses[-1] < 0.99 * self.best_loss:
+        if not losses[-1] < 0.999 * self.best_loss:
             return
-        self.best_loss = np.mean(losses[-1])
+        self.best_loss = losses[-1]
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
@@ -177,10 +162,28 @@ class InfoScreen:
         print("-" * 100)
 
 
+def get_device():
+    device = (
+        torch.device("cpu")
+        if torch.backends.mps.is_available()
+        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
+    print("Device:", device)
+    return device
+
+
+def move_to(tensor_list, device=torch.device("cpu")):
+    out_list = []
+    for tensor in tensor_list:
+        tensor = tensor.to(device)
+        out_list.append(tensor)
+    return out_list
+
+
 def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")):
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
-    model, optimizer, losses = init_training(model, lr=lr, device=device)
+    model, optimizer, scheduler, _ = init_training(model, lr=lr, device=device)
     inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
     t_B1 = t_B1.to(device)
     loss = torch.inf
@@ -197,17 +200,18 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        # scheduler.step(loss.item())
         if epoch % 1000 == 0:
-            print(f"Epoch: {epoch}, Loss: {loss.item():.6f}")
-    # plt.figure()
-    # plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
-    # plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
-    # plt.figure()
-    # plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
-    # plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
-    # plt.figure()
-    # plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
-    # plt.show()
+            print(f"Epoch: {epoch}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
+    plt.figure()
+    plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
+    plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
+    plt.figure()
+    plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
+    plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
+    plt.figure()
+    plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
+    plt.show()
     return model
 
 
@@ -215,7 +219,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=10, min_lr=1e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -227,3 +231,18 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
     # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
     return (L2_loss, boundary_vals_pulse, boundary_vals_grad / gradient_scale**2)  # + H1_loss
+
+
+def load_data(path):
+    data_dict = torch.load(path, weights_only=False)
+    # epoch = data_dict["epoch"]
+    # L2_loss = data_dict["L2_loss"]
+    # D_loss = data_dict["D_loss"]
+    # losses = data_dict["losses"]
+    # model = data_dict["model"]
+    # optimizer = data_dict["optimizer"]
+    # inputs = data_dict["inputs"]
+    # targets = data_dict["targets"]
+    pulse = data_dict["pulse"].detach().cpu()
+    gradient = data_dict["gradient"].detach().cpu()
+    return pulse, gradient

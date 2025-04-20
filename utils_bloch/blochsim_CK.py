@@ -10,7 +10,6 @@ compatibility layer that detects the input type and uses the appropriate functio
 
 import numpy as np
 import torch
-from typing import Tuple, Union, List, Optional, Any, Dict
 
 
 G3 = lambda Gz: torch.column_stack((0 * Gz.flatten(), 0 * Gz.flatten(), Gz.flatten()))
@@ -20,9 +19,8 @@ def my_sinc(x):
     if x.device != torch.device("mps:0"):
         return torch.sinc(x / np.pi)
     large_x = torch.abs(x) > 1e-2
-    small_x = ~large_x
     result = torch.zeros_like(x, dtype=torch.float32, device=x.device)
-    result[small_x] = 1 - x[small_x] ** 2 / 6 + x[small_x] ** 4 / 120 + x[small_x] ** 6 / 5040
+    result[~large_x] = 1 - x[~large_x] ** 2 / 6 + x[~large_x] ** 4 / 120 + x[~large_x] ** 6 / 5040
     result[large_x] = torch.sin(x[large_x]) / x[large_x]
     return result
 
@@ -125,8 +123,9 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    mxy = 2 * mz0 * torch.conj(statea) * stateb + mxy0 * torch.conj(statea) ** 2 - torch.conj(mxy0) * stateb**2
-    mz = mz0 * (statea * torch.conj(statea) - stateb * torch.conj(stateb))
-    mz = mz + 2 * torch.real(mxy0 * torch.conj(statea) * (-torch.conj(stateb)))
+    stateaBar = torch.conj(statea)
+    statebBar = torch.conj(stateb)
+    mxy = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
+    mz = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
 
     return mxy, mz.real

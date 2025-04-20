@@ -2,6 +2,17 @@ import torch.nn as nn
 import torch
 
 
+class PulseGradientModel(nn.Module):
+    def __init__(self, gradient_scale=200):
+        super(PulseGradientModel, self).__init__()
+        self.gradient_scale = gradient_scale
+
+    def model_output_to_pulse_gradient(self, model_output):
+        pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
+        gradient = self.gradient_scale * model_output[:, 2:]
+        return pulse, gradient
+
+
 class FourierPulse(nn.Module):
     """Auxiliary 1d Fourier series. Used in FourierSeries class."""
 
@@ -60,7 +71,7 @@ class MLP(nn.Module):
     def forward(self, x):
         output = self.model(x)
         scaling = (x - self.tmin) * (self.tmax - x)
-        output[0:2] = output[0:2] * scaling  # boundary values of pulse are 0, but not of gradient
+        output = output * scaling  # boundary values of pulse are 0, but not of gradient
         return output
 
 
@@ -89,22 +100,38 @@ class RBFN(nn.Module):
         self.tmax = tmax
 
     def forward(self, x):
-        rbf = torch.exp(-2 * torch.cdist(x, self.centers) ** 2)
+        rbf = torch.exp(-torch.cdist(x, self.centers) ** 2)
         rbf = self.linear(rbf) * (x - self.tmin) * (self.tmax - x)
         return rbf
 
 
 class FourierMLP(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10):
+    def __init__(
+        self,
+        input_dim=1,
+        hidden_dim=64,
+        output_dim=3,
+        num_layers=3,
+        num_fourier_features=10,
+        frequency_scale=10,
+        tmin=0,
+        tmax=1,
+    ):
         super(FourierMLP, self).__init__()
-        self.fourier_weights = nn.Parameter(torch.randn(num_fourier_features, input_dim))
+        # Scale the Fourier weights to increase frequencies
+        self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]
         for _ in range(num_layers - 1):
             layers += [nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
         layers += [nn.Linear(hidden_dim, output_dim)]
         self.model = nn.Sequential(*layers)
+        self.tmin = tmin
+        self.tmax = tmax
 
     def forward(self, x):
+        # Scaling factor to enforce boundary conditions
+        scaling = (x - self.tmin) * (self.tmax - x)
+        # Apply Fourier feature mapping
         x = torch.matmul(x, self.fourier_weights.T)
         x = torch.cat([torch.sin(x), torch.cos(x)], dim=-1)
-        return self.model(x)
+        return self.model(x) * scaling
