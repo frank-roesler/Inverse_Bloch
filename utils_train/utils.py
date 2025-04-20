@@ -47,9 +47,9 @@ class TrainLogger:
             return
         if not epoch % self.save_every == 0:
             return
-        if not losses[-1] < self.best_loss:
+        if not losses[-1] < 0.99 * self.best_loss:
             return
-        self.best_loss = np.mean(losses[-4:])
+        self.best_loss = losses[-1]
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
@@ -172,7 +172,7 @@ class InfoScreen:
         print("Epoch: ", epoch)
         print(f"L2 Loss: {L2_loss.item():.5f}")
         print(f"D Loss: {D_Loss.item():.5f}")
-        print(f"learning rate: {lr:.5f}")
+        print(f"learning rate: {lr:.6f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
 
@@ -216,7 +216,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=100, verbose=True
+        optimizer, mode="min", factor=0.9, patience=20, verbose=True, min_lr=1e-6
     )
     losses = []
     return model, optimizer, scheduler, losses
@@ -227,5 +227,15 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
-    # H1_loss = torch.mean(findiff(xy_profile-1+target)**2) + torch.mean(findiff(z_profile-target)**2) # NOT IMPLEMENTED
-    return (L2_loss, boundary_vals_pulse, boundary_vals_grad / gradient_scale**2)  # + H1_loss
+    gradient_loss = 0.00001 * torch.mean(gradient**2)
+    pulse_height_loss = (torch.max(torch.abs(pulse)) - 0.026) ** 2
+    pulse_height_loss[pulse_height_loss < 0] = 0.0
+    gradient_diff_loss = torch.max(torch.diff(gradient.squeeze()) ** 2)
+    return (
+        L2_loss,
+        boundary_vals_pulse,
+        boundary_vals_grad / gradient_scale**2,
+        gradient_loss,
+        pulse_height_loss,
+        gradient_diff_loss,
+    )

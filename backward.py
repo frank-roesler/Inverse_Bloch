@@ -11,7 +11,10 @@ B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
 )
 
-model = MLP(hidden_dim=hidden_dim, num_layers=num_layers, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
+model = SIREN(
+    omega_0=omega_0, hidden_dim=hidden_dim, num_layers=num_layers, tmin=t_B1[0].item(), tmax=t_B1[-1].item()
+).float()
+# model = MLP(hidden_dim=hidden_dim, num_layers=num_layers, tmin=t_B1[0].item(), tmax=t_B1[-1].item()).float()
 # model = FourierSeries(
 #     n_coeffs=n_coeffs, tmin=t_B1[0].item(), tmax=t_B1[-1].item()
 # ).float()
@@ -31,8 +34,12 @@ for epoch in range(epochs + 1):
 
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
 
-    L2_loss, boundary_vals_pulse, boundary_vals_grad = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-    loss = L2_loss, boundary_vals_pulse  # + boundary_vals_grad
+    L2_loss, boundary_vals_pulse, boundary_vals_grad, gradient_loss, pulse_height_loss, gradient_diff_loss = loss_fn(
+        mz, mxy, target_z, target_xy, pulse, gradient
+    )
+    loss = (
+        L2_loss + gradient_loss + gradient_diff_loss + pulse_height_loss
+    )  # + boundary_vals_pulse  # + boundary_vals_grad
 
     losses.append(loss.item())
     optimizer.zero_grad()
@@ -41,5 +48,5 @@ for epoch in range(epochs + 1):
     scheduler.step(loss.item())
 
     infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.print_info(epoch, L2_loss, boundary_vals_pulse, lr)
+    infoscreen.print_info(epoch, L2_loss, gradient_diff_loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(epoch, L2_loss, boundary_vals_pulse, losses, model, optimizer, pulse, gradient)

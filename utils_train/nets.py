@@ -58,13 +58,15 @@ class MLP(nn.Module):
     def forward(self, x):
         output = self.model(x)
         scaling = (x - self.tmin) * (self.tmax - x)
-        output[0:2] = output[0:2] * scaling  # boundary values of pulse are 0, but not of gradient
+        output[:, 0:2] = output[:, 0:2] * scaling  # boundary values of pulse are 0, but not of gradient
         return output
 
 
 class SIREN(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=1, num_layers=3, omega_0=6):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, omega_0=6, tmin=0, tmax=1):
         super(SIREN, self).__init__()
+        self.tmin = tmin
+        self.tmax = tmax
         self.omega_0 = omega_0
         self.layers = nn.ModuleList()
         self.layers.append(nn.Linear(input_dim, hidden_dim))
@@ -73,13 +75,16 @@ class SIREN(nn.Module):
         self.final_layer = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
+        scaling = (x - self.tmin) * (self.tmax - x)
         for layer in self.layers:
             x = torch.sin(self.omega_0 * layer(x))
-        return self.final_layer(x)
+        output = self.final_layer(x)
+        output[:, 0:2] = output[:, 0:2] * scaling
+        return output
 
 
 class RBFN(nn.Module):
-    def __init__(self, num_centers=10, output_dim=1):
+    def __init__(self, num_centers=10, output_dim=3):
         super(RBFN, self).__init__()
         self.centers = nn.Parameter(torch.randn(num_centers, 1))
         self.linear = nn.Linear(num_centers, output_dim)
@@ -90,7 +95,7 @@ class RBFN(nn.Module):
 
 
 class FourierMLP(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=1, num_layers=3, num_fourier_features=10):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10):
         super(FourierMLP, self).__init__()
         self.fourier_weights = nn.Parameter(torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]
