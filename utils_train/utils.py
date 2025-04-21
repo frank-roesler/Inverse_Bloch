@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import torch
 import numpy as np
-from params import gradient_scale, get_fixed_inputs
+from params import get_fixed_inputs
 import os
 import json
 
@@ -27,6 +27,7 @@ class TrainLogger:
         self.log["gradient"] = gradient
         self.log["axes"] = axes
         self.save(epoch, losses)
+        self.export_json()
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
         if epoch <= 1000:
@@ -39,27 +40,27 @@ class TrainLogger:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
-    
-    def export_json(self, directory="results"):
-        export_path = os.path.join(directory, f"sms_nn_{self.log["model"].name}.json")
-        dur = 1000 * self.log["t_B1"][-1].item()
 
-        data = {  "id": "sms_nn_150425_MLP_square2",
-                "set": {
-                    "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
-                    "dur": dur,
-                    "pts": len(self.log["t_B1"]),
-                    "amplInt": None,
-                    "refocFract": None
-                },
-                "conf": {
-                    "slthick": 0.02,
-                    "bs": 1.5,
-                    "tb": 4.8,
-                    "mb": 2
-                },
-                "rfPls": {"real": torch.real(self.log["pulse"]).tolist(),
-                          "imag": torch.imag(self.log["pulse"]).tolist(),}}
+    def export_json(self, directory="results"):
+        modelname = self.log["model"].name
+        export_path = os.path.join(directory, f"sms_nn_{modelname}.json")
+        dur = 1000 * self.log["axes"]["t_B1"][-1].item()
+
+        data = {
+            "id": "sms_nn_150425_MLP_square2",
+            "set": {
+                "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
+                "dur": dur,
+                "pts": len(self.log["axes"]["t_B1"]),
+                "amplInt": None,
+                "refocFract": None,
+            },
+            "conf": {"slthick": 0.02, "bs": 1.5, "tb": 4.8, "mb": 2},
+            "rfPls": {
+                "real": torch.real(self.log["pulse"]).squeeze().tolist(),
+                "imag": torch.imag(self.log["pulse"]).squeeze().tolist(),
+            },
+        }
         with open(export_path, "w") as json_file:
             json.dump(data, json_file, indent=4)
 
@@ -248,20 +249,22 @@ def init_training(model, lr, device=torch.device("cpu")):
     return model, optimizer, scheduler, losses
 
 
+def threshold_loss(x, threshold):
+    threshold_loss = torch.max(torch.abs(x)) - threshold
+    threshold_loss[threshold_loss < 0] = 0.0
+    return threshold_loss**2
+
+
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
     L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
-    boundary_vals_grad = gradient[0] ** 2 + gradient[-1] ** 2
-    gradient_loss = 0.00001 * torch.mean(gradient**2)
-    pulse_height_loss = (torch.max(torch.abs(pulse)) - 0.026) ** 2
-    pulse_height_loss[pulse_height_loss < 0] = 0.0
-    gradient_diff_loss = torch.max(torch.diff(gradient.squeeze()) ** 2)
-    return (
-        L2_loss,
-        boundary_vals_pulse,
-        boundary_vals_grad / gradient_scale**2,
-        gradient_loss,
-        pulse_height_loss,
-        gradient_diff_loss,
-    )
+    gradient_height_loss = threshold_loss(gradient, 50)
+    pulse_height_loss = threshold_loss(pulse, 0.03)
+    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 100)
+    print(f"Gradient diff loss: {gradient_diff_loss.item():.4f}")
+    print(f"Gradient loss: {gradient_height_loss.item():.4f}")
+    print(f"Pulse height loss: {pulse_height_loss.item():.4f}")
+    print(f"L2 loss: {L2_loss.item():.4f}")
+    print(f"Boundary vals pulse: {boundary_vals_pulse.item():.4f}")
+    return (L2_loss, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
