@@ -268,3 +268,18 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     print(f"L2 loss: {L2_loss.item():.4f}")
     print(f"Boundary vals pulse: {boundary_vals_pulse.item():.4f}")
     return (L2_loss, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
+
+
+def load_data(path):
+    data_dict = torch.load(path, weights_only=False, map_location="cpu")
+    # epoch = data_dict["epoch"]
+    # L2_loss = data_dict["L2_loss"]
+    # D_loss = data_dict["D_loss"]
+    # losses = data_dict["losses"]
+    # model = data_dict["model"]
+    # optimizer = data_dict["optimizer"]
+    # inputs = data_dict["inputs"]
+    # targets = data_dict["targets"]
+    pulse = data_dict["pulse"].detach().cpu()
+    gradient = data_dict["gradient"].detach().cpu()
+    return pulse, gradient
