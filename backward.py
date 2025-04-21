@@ -11,7 +11,7 @@ B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
 )
 
-model = get_model("MLP", **model_args)
+model = get_model("MixedModel", **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:
@@ -26,10 +26,12 @@ for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
 
-    L2_loss, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss = loss_fn(
+    L2_loss_mxy, L2_loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss = loss_fn(
         mz, mxy, target_z, target_xy, pulse, gradient
     )
-    loss = L2_loss + gradient_height_loss + gradient_diff_loss + pulse_height_loss
+    loss = (
+        L2_loss_mxy + L2_loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse
+    )
 
     losses.append(loss.item())
     optimizer.zero_grad()
@@ -37,11 +39,11 @@ for epoch in range(epochs + 1):
     optimizer.step()
     scheduler.step(loss.item())
 
-    infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.print_info(epoch, L2_loss, optimizer.param_groups[0]["lr"])
+    infoscreen.plot_info(epoch, losses, inputs["pos"].cpu()[:, 2], t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.print_info(epoch, loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,
-        L2_loss,
+        loss,
         boundary_vals_pulse,
         losses,
         model,

@@ -73,22 +73,21 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        import matplotlib.gridspec as gridspec  # Add this import if not already present
-
-    def init_plots(self):
         self.fig = plt.figure(figsize=(12, 7), constrained_layout=False)
         spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
 
         # First row: 3 plots spanning the entire width
         spec_top = gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=spec[0, :])  # Split first row into 3 columns
         self.ax = [None] * 3
-        self.ax[0] = self.fig.add_subplot(spec_top[0])  # First column
-        self.ax[1] = self.fig.add_subplot(spec_top[1])  # Second column
-        self.ax[2] = self.fig.add_subplot(spec_top[2])  # Third column
-
+        self.ax[0] = self.fig.add_subplot(spec_top[0])
+        self.ax[1] = self.fig.add_subplot(spec_top[1])
+        self.ax[2] = self.fig.add_subplot(spec_top[2])
         # Second row: 2 equally wide plots
-        self.ax_bottom_left = self.fig.add_subplot(spec[1, 0])  # Left plot
-        self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])  # Right plot
+        self.ax_bottom_left = self.fig.add_subplot(spec[1, 0])
+        self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])
+        self.ax_phase = self.ax_bottom_right.twinx()
+        self.ax_phase.set_ylabel("Phase (radians)")
+        self.ax_phase.set_ylim(-40, 40)
 
         # Initialize plots for the first row
         self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
@@ -101,6 +100,7 @@ class InfoScreen:
         self.mz_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="M_z")[0]
         self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Target_xy")[0]
         self.mxy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="M_xy")[0]
+        self.phase_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Phase")[0]
         # self.error_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.5, label="Error (z and xy)")[0]
 
         # Set titles and legends
@@ -128,11 +128,11 @@ class InfoScreen:
             pulse_real = np.real(pulse.detach().cpu().numpy())
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
             gradient_for_plot = gradient.detach().cpu().numpy()
+            phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
+            phase[mxy_abs < 0.2] = None
 
-            # error = np.sqrt((mz_plot - tgt_z) ** 2 + (mxy_abs - tgt_xy) ** 2)
-
-            self.ax_bottom_left.set_xlim(fmin, fmax)
-            self.ax_bottom_right.set_xlim(fmin, fmax)
+            # self.ax_bottom_left.set_xlim(fmin, fmax)
+            # self.ax_bottom_right.set_xlim(fmin, fmax)
             self.ax[0].set_xlim(t[0], t[-1])
             self.ax[1].set_xlim(t[0], t[-1])
             self.ax[2].set_xlim(0, epoch + 1)
@@ -148,12 +148,12 @@ class InfoScreen:
             self.ax[1].set_ylim(
                 (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
             )
+            self.ax_phase.set_ylim(-40, 40)
 
             self.target_z_plot.set_xdata(fAx)
             self.target_xy_plot.set_xdata(fAx)
             self.mz_plot.set_xdata(fAx)
             self.mxy_plot.set_xdata(fAx)
-            # self.error_plot.set_xdata(fAx)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
@@ -163,7 +163,8 @@ class InfoScreen:
             self.target_xy_plot.set_ydata(tgt_xy)
             self.mz_plot.set_ydata(mz_plot)
             self.mxy_plot.set_ydata(mxy_abs)
-            # self.error_plot.set_ydata(error)
+            self.phase_plot.set_xdata(fAx)
+            self.phase_plot.set_ydata(phase)
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
             self.pulse_imag_plot.set_ydata(pulse_imag)
@@ -180,7 +181,7 @@ class InfoScreen:
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"L2 Loss: {L2_loss.item():.5f}")
+        print(f"Loss: {L2_loss.item():.5f}")
         print(f"learning rate: {lr:.6f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
@@ -242,7 +243,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=10, min_lr=1e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, min_lr=5e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -255,12 +256,13 @@ def threshold_loss(x, threshold):
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss = torch.mean((z_profile - tgt_z) ** 2) + torch.mean((xy_profile_abs - tgt_xy) ** 2)
+    L2_loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
+    L2_loss_mz = torch.mean((z_profile - tgt_z) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
     pulse_height_loss = threshold_loss(pulse, 0.03)
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 100)
-    return (L2_loss, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
+    return (L2_loss_mxy, L2_loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
 
 
 def load_data(path):
