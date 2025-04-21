@@ -38,7 +38,7 @@ for epoch in range(epochs + 1):
     scheduler.step(loss.item())
 
     infoscreen.plot_info(epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.print_info(epoch, L2_loss, boundary_vals_pulse, optimizer.param_groups[0]["lr"])
+    infoscreen.print_info(epoch, L2_loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,
         L2_loss,
