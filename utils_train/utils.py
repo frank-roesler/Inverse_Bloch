@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import torch
 import numpy as np
-from params import get_fixed_inputs
+from params import get_fixed_inputs, model_args
 import os
 import json
 
@@ -176,12 +176,11 @@ class InfoScreen:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def print_info(self, epoch, L2_loss, D_Loss, lr):
+    def print_info(self, epoch, L2_loss, lr):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
         print(f"L2 Loss: {L2_loss.item():.5f}")
-        print(f"D Loss: {D_Loss.item():.5f}")
         print(f"learning rate: {lr:.6f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
@@ -215,12 +214,11 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
     epoch = 0
     while loss > thr:
         epoch += 1
-        model_output = model(t_B1)
+        pulse, gradient = model(t_B1)
 
-        loss_pulse_real = torch.mean((model_output[:, 0:1] - torch.real(target_pulse)) ** 2)
-        loss_pulse_imag = torch.mean((model_output[:, 1:2] - torch.imag(target_pulse)) ** 2)
-        loss_gradient = torch.mean((gradient_scale * model_output[:, 2:] - target_gradient) ** 2)
-        loss = loss_pulse_real + loss_pulse_imag + loss_gradient / gradient_scale
+        loss_pulse = torch.mean(torch.abs(pulse - target_pulse) ** 2)
+        loss_gradient = torch.mean((gradient - target_gradient) ** 2)
+        loss = loss_pulse + loss_gradient / model_args["gradient_scale"]
 
         optimizer.zero_grad()
         loss.backward()
@@ -229,13 +227,13 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
         if epoch % 1000 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
     plt.figure()
-    plt.plot(model_output[:, 0:1].detach().cpu().numpy(), label="pulse real")
+    plt.plot(torch.real(pulse).detach().cpu().numpy(), label="pulse real")
     plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
     plt.figure()
-    plt.plot(model_output[:, 1:2].detach().cpu().numpy(), label="pulse imag")
+    plt.plot(torch.imag(pulse).detach().cpu().numpy(), label="pulse imag")
     plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
     plt.figure()
-    plt.plot(model_output[:, 2:].detach().cpu().numpy(), label="gradient")
+    plt.plot(gradient.detach().cpu().numpy(), label="gradient")
     plt.show()
     return model
 
@@ -244,7 +242,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=10, min_lr=1e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=10, min_lr=1e-5)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -262,11 +260,6 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     gradient_height_loss = threshold_loss(gradient, 50)
     pulse_height_loss = threshold_loss(pulse, 0.03)
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 100)
-    print(f"Gradient diff loss: {gradient_diff_loss.item():.4f}")
-    print(f"Gradient loss: {gradient_height_loss.item():.4f}")
-    print(f"Pulse height loss: {pulse_height_loss.item():.4f}")
-    print(f"L2 loss: {L2_loss.item():.4f}")
-    print(f"Boundary vals pulse: {boundary_vals_pulse.item():.4f}")
     return (L2_loss, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
 
 
