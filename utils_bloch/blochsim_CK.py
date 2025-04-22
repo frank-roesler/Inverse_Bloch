@@ -94,7 +94,7 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     normSquared = torch.abs(bxy) ** 2 + bz**2
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
     Phi[normSquared > 0] = dt * gam * torch.sqrt(normSquared[normSquared > 0])
-    sinc_part = 1j * gam * dt * 0.5 * my_sinc(Phi / 2)
+    sinc_part = -1j * gam * dt * 0.5 * my_sinc(Phi / 2)
     alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy * sinc_part
     alphaBar = torch.conj(alpha)

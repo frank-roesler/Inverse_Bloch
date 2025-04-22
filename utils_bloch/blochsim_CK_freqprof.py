@@ -51,7 +51,7 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
         stateb = np.zeros((Ns,), dtype=complex)
 
         Phi = dt * gam * np.sqrt(np.abs(bxy) ** 2 + bz**2)
-        sinc_part = 1j * gam * dt * 0.5 * np.sinc(Phi / 2)
+        sinc_part = -1j * gam * dt * 0.5 * np.sinc(Phi / 2 / np.pi)
         alpha = np.cos(Phi / 2) - bz * sinc_part
         beta = -bxy * sinc_part
         alphaBar = np.conj(alpha)
