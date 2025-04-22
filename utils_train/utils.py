@@ -87,7 +87,6 @@ class InfoScreen:
         self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])
         self.ax_phase = self.ax_bottom_right.twinx()
         self.ax_phase.set_ylabel("Phase (radians)")
-        self.ax_phase.set_ylim(-40, 40)
 
         # Initialize plots for the first row
         self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
@@ -99,9 +98,8 @@ class InfoScreen:
         self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="Target_z")[0]
         self.mz_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="M_z")[0]
         self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Target_xy")[0]
-        self.mxy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="M_xy")[0]
-        self.phase_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Phase")[0]
-        # self.error_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.5, label="Error (z and xy)")[0]
+        self.mxy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="|M_xy|")[0]
+        self.phase_plot = self.ax_phase.plot([0], [1], linewidth=1, label="Phase", color="g")[0]
 
         # Set titles and legends
         self.ax[0].set_title("Pulse")
@@ -113,12 +111,20 @@ class InfoScreen:
         self.ax[1].legend()
         self.ax[2].legend()
         self.ax_bottom_left.legend()
-        self.ax_bottom_right.legend()
+        # self.ax_bottom_right.legend()
+        # self.ax_phase.legend()
+
+        # Combine legends from both axes
+        lines_bottom_right, labels_bottom_right = self.ax_bottom_right.get_legend_handles_labels()
+        lines_phase, labels_phase = self.ax_phase.get_legend_handles_labels()
+        self.ax_bottom_right.legend(
+            lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right"
+        )
 
     def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
         """plots info curves during training"""
-        fmin = -20  # torch.min(fAx).item()
-        fmax = 20  # torch.max(fAx).item()
+        fmin = torch.min(fAx).item()
+        fmax = torch.max(fAx).item()
         if epoch % self.output_every == 0:
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
@@ -129,15 +135,19 @@ class InfoScreen:
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
-            phase[mxy_abs < 0.2] = None
+            phasemin = np.min(phase)
+            phasemax = np.max(phase)
+            phase[target_xy < 0.5] = np.nan
 
-            # self.ax_bottom_left.set_xlim(fmin, fmax)
-            # self.ax_bottom_right.set_xlim(fmin, fmax)
+            self.ax_bottom_left.set_xlim(fmin, fmax)
+            self.ax_bottom_right.set_xlim(fmin, fmax)
+            self.ax_phase.set_xlim(fmin, fmax)
             self.ax[0].set_xlim(t[0], t[-1])
             self.ax[1].set_xlim(t[0], t[-1])
             self.ax[2].set_xlim(0, epoch + 1)
             self.ax_bottom_left.set_ylim(-0.1, 1.1)
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
+            self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim(
                 (
                     -1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
@@ -148,12 +158,12 @@ class InfoScreen:
             self.ax[1].set_ylim(
                 (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
             )
-            self.ax_phase.set_ylim(-40, 40)
 
             self.target_z_plot.set_xdata(fAx)
             self.target_xy_plot.set_xdata(fAx)
             self.mz_plot.set_xdata(fAx)
             self.mxy_plot.set_xdata(fAx)
+            self.phase_plot.set_xdata(fAx)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
@@ -163,7 +173,6 @@ class InfoScreen:
             self.target_xy_plot.set_ydata(tgt_xy)
             self.mz_plot.set_ydata(mz_plot)
             self.mxy_plot.set_ydata(mxy_abs)
-            self.phase_plot.set_xdata(fAx)
             self.phase_plot.set_ydata(phase)
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)

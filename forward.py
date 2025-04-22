@@ -7,7 +7,7 @@ from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from aux.blochsim_CK_freqprof_old import plot_off_resonance_old
 from time import time
 
-path = "results/210425_Mixed_square/train_log.pt"
+path = "results/220425_Mixed_square/train_log.pt"
 
 inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
 target_z, target_xy, _, _ = get_test_targets()
@@ -16,15 +16,7 @@ target_z, target_xy, _, _ = get_test_targets()
 # G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
 B1, G = load_data(path)
 
-t0 = time()
 plot_off_resonance(B1.numpy(), G.numpy(), inputs["pos"], Nz, dt)
-dt1 = time() - t0
-t1 = time()
-plot_off_resonance_old(B1.numpy(), G.numpy(), inputs["pos"], Nz, dt)
-dt2 = time() - t1
-print("-" * 100)
-print(f"New: {dt1:.2f} s")
-print(f"Old: {dt2:.2f} s")
 
 # mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
 

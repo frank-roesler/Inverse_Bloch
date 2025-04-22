@@ -11,7 +11,7 @@ B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
 )
 
-model = get_model("MixedModel", **model_args)
+model = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:

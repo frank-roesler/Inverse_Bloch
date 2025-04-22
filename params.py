@@ -12,8 +12,9 @@ pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
 
 # MODEL PARAMETERS:
+modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries
 model_args = {
-    "n_coeffs": 20,  # Fourier Series
+    "n_coeffs": 10,  # Fourier Series
     "omega_0": 2.5,  # SIREN
     "hidden_dim": 128,  # MLP, SIREN
     "num_layers": 16,  # MLP, SIREN

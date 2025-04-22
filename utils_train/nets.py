@@ -68,7 +68,7 @@ class FourierPulse(nn.Module):
         super().__init__()
         self.tpulse = t_max - t_min
         p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
-        weights = torch.exp(-0.01 * (torch.arange(-n_coeffs - 1, n_coeffs)) ** 2)
+        weights = torch.exp(-0.01 * (torch.arange(-n_coeffs, n_coeffs + 1)) ** 2)
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
         self.k = torch.arange(-n_coeffs, n_coeffs + 1, requires_grad=False).unsqueeze(0)
