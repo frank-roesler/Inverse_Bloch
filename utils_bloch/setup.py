@@ -21,16 +21,17 @@ def get_fixed_inputs():
     tAx = tAx.float()
     fAx = fAx.float()
     t_B1 = t_B1.float()
+    dx = (inputs["pos"][-1, 2] - inputs["pos"][0, 2]) / (len(inputs["pos"][:, 2]) - 1)
     inputs["pos"] = torch.from_numpy(inputs["pos"]).to(torch.float32).detach().requires_grad_(False)
     sens = sens.detach().requires_grad_(False)
     B0 = B0.detach().requires_grad_(False)
     tAx = tAx.detach().requires_grad_(False)
     fAx = fAx.detach().requires_grad_(False)
-    return (inputs, dt, Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1))
+    return (inputs, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1))
 
 
 def get_test_targets():
-    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
+    inputs, dt, dx, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
     G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
     B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
     mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)

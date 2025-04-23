@@ -26,11 +26,23 @@ for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0, **inputs)
 
-    L2_loss_mxy, L2_loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss = loss_fn(
-        mz, mxy, target_z, target_xy, pulse, gradient
-    )
+    (
+        L2_loss_mxy,
+        L2_loss_mz,
+        boundary_vals_pulse,
+        gradient_height_loss,
+        pulse_height_loss,
+        gradient_diff_loss,
+        phase_loss,
+    ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
     loss = (
-        L2_loss_mxy + L2_loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse
+        L2_loss_mxy
+        + L2_loss_mz
+        + gradient_height_loss
+        + gradient_diff_loss
+        + pulse_height_loss
+        + 100 * boundary_vals_pulse
+        + phase_loss
     )
 
     losses.append(loss.item())
@@ -39,7 +51,7 @@ for epoch in range(epochs + 1):
     optimizer.step()
     scheduler.step(loss.item())
 
-    infoscreen.plot_info(epoch, losses, inputs["pos"].cpu()[:, 2], t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(epoch, losses, inputs["pos"], t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
     infoscreen.print_info(epoch, loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,

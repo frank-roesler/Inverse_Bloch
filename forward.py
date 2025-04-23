@@ -4,12 +4,10 @@ import numpy as np
 from params import *
 import matplotlib.pyplot as plt
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
-from aux.blochsim_CK_freqprof_old import plot_off_resonance_old
 from time import time
 
 path = "results/220425_Mixed_square/train_log.pt"
 
-inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
 target_z, target_xy, _, _ = get_test_targets()
 
 # B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
