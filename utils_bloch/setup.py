@@ -35,10 +35,10 @@ def get_test_targets():
     inputs, dt, dx, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
     pos = inputs["pos"]
     target_xy = torch.zeros((len(fAx)), dtype=torch.float32, requires_grad=False)
-    target_xy[pos[:, 2] > -0.03] = 1
-    target_xy[pos[:, 2] > -0.01] = 0
-    target_xy[pos[:, 2] > 0.01] = 1
-    target_xy[pos[:, 2] > 0.03] = 0
+    target_xy[pos[:, 2] > -0.025] = 1
+    target_xy[pos[:, 2] > -0.005] = 0
+    target_xy[pos[:, 2] > 0.005] = 1
+    target_xy[pos[:, 2] > 0.025] = 0
     target_z = 1 - target_xy
     return target_z, target_xy
 
