@@ -4,7 +4,7 @@ from utils_bloch.blochsim_CK import blochsim_CK
 from params import *
 
 device = get_device()
-target_z, target_xy, _, _ = get_test_targets()
+target_z, target_xy = get_test_targets()
 # target_xy, _, target_z = get_smooth_targets(smoothness=1)
 
 gam = 267522.1199722082
