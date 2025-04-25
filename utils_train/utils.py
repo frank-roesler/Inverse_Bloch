@@ -14,7 +14,9 @@ class TrainLogger:
         self.save_every = save_every
         self.best_loss = np.inf
 
-    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, inputs, targets, axes):
+    def log_epoch(
+        self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, inputs, model_args, targets, axes
+    ):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
@@ -22,6 +24,7 @@ class TrainLogger:
         self.log["model"] = model
         self.log["optimizer"] = optimizer
         self.log["inputs"] = inputs
+        self.log["model_args"] = model_args
         self.log["targets"] = targets
         self.log["pulse"] = pulse
         self.log["gradient"] = gradient
@@ -73,7 +76,7 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig = plt.figure(figsize=(12, 7), constrained_layout=False)
+        self.fig = plt.figure(figsize=(11, 6), constrained_layout=False)
         spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
 
         # First row: 3 plots spanning the entire width
@@ -136,8 +139,8 @@ class InfoScreen:
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
-            phasemin = np.min(phase)
-            phasemax = np.max(phase)
+            phasemin = np.min(phase[tgt_xy >= 0.5]) - 10
+            phasemax = np.max(phase[tgt_xy >= 0.5]) + 10
             phase[tgt_xy < 0.5] = np.nan
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
@@ -253,7 +256,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, min_lr=5e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=30, min_lr=5e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -270,28 +273,28 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     L2_loss_mz = torch.mean((z_profile - tgt_z) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
-    pulse_height_loss = threshold_loss(pulse, 0.03)
-    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 100)
-    phase_diff = torch_unwrap(torch.diff(torch.angle(xy_profile)))
+    pulse_height_loss = threshold_loss(pulse, 0.01)
+    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 200)
+    phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_diff[tgt_xy[:-1] < 0.5] = 0.0
-    phase_loss = threshold_loss(phase_diff, 0.5) / 100
+    phase_loss = torch.mean(phase_diff**2)
 
-    print("L2_loss_mxy", L2_loss_mxy.item())
-    print("L2_loss_mz", L2_loss_mz.item())
-    print("boundary_vals_pulse", boundary_vals_pulse.item())
-    print("gradient_height_loss", gradient_height_loss.item())
-    print("pulse_height_loss", pulse_height_loss.item())
-    print("gradient_diff_loss", gradient_diff_loss.item())
-    print("phase_loss", phase_loss.item())
+    # print("L2_loss_mxy", L2_loss_mxy.item())
+    # print("L2_loss_mz", L2_loss_mz.item())
+    # print("boundary_vals_pulse", boundary_vals_pulse.item())
+    # print("gradient_height_loss", gradient_height_loss.item())
+    # print("pulse_height_loss", pulse_height_loss.item())
+    # print("gradient_diff_loss", gradient_diff_loss.item())
+    # print("phase_loss", phase_loss.item())
 
     return (
         L2_loss_mxy,
         L2_loss_mz,
-        boundary_vals_pulse,
+        100 * boundary_vals_pulse,
         gradient_height_loss,
         pulse_height_loss,
         gradient_diff_loss,
-        phase_loss,
+        0.1 * phase_loss,
     )
 
 
