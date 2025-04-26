@@ -32,21 +32,14 @@ def get_fixed_inputs():
 
 def get_test_targets():
     inputs, dt, dx, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
-    G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-    mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
-    target_z = mz > 0.5
-    target_xy = torch.abs(mxy) > 0.5
-
-    target_z = target_z.to(torch.float32)
-    target_xy = target_xy.to(torch.float32)
-    mz = mz.to(torch.float32)
-    mxy_abs = torch.abs(mxy).to(torch.float32)
-    target_z = target_z.detach().requires_grad_(False)
-    target_xy = target_xy.detach().requires_grad_(False)
-    mz = mz.detach().requires_grad_(False)
-    mxy_abs = mxy_abs.detach().requires_grad_(False)
-    return (target_z, target_xy, mz, mxy_abs)
+    pos = inputs["pos"]
+    target_xy = torch.zeros((len(fAx)), dtype=torch.float32, requires_grad=False)
+    target_xy[pos[:, 2] > -0.025] = 1
+    target_xy[pos[:, 2] > -0.005] = 0
+    target_xy[pos[:, 2] > 0.005] = 1
+    target_xy[pos[:, 2] > 0.025] = 0
+    target_z = 1 - target_xy
+    return target_z, target_xy
 
 
 def get_smooth_targets(smoothness=1):

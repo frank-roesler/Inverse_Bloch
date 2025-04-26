@@ -14,7 +14,7 @@ inputs, dt, dx, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries
 model_args = {
-    "n_coeffs": 10,  # Fourier Series
+    "n_coeffs": 30,  # Fourier Series
     "omega_0": 2.5,  # SIREN
     "hidden_dim": 256,  # MLP, SIREN
     "num_layers": 32,  # MLP, SIREN
