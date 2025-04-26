@@ -9,7 +9,7 @@ target_z, target_xy = get_test_targets()
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offset = -297.3 * 4.7 / gam_hz_mt  # center between 0 & 4.7ppm
+freq_offset = -297.3 * 4.7 / gam_hz_mt 
 
 B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
     (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
