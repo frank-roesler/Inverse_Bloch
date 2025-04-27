@@ -41,7 +41,7 @@ for epoch in range(epochs + 1):
         L2_loss_mxy
         + L2_loss_mz
         + gradient_height_loss
-        # + gradient_diff_loss
+        + gradient_diff_loss
         + pulse_height_loss
         + boundary_vals_pulse
         + phase_loss

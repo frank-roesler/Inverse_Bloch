@@ -29,7 +29,12 @@ def get_fixed_inputs(tfactor=1):
     B0 = B0.detach().requires_grad_(False)
     tAx = tAx.detach().requires_grad_(False)
     fAx = fAx.detach().requires_grad_(False)
-    M0 = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False)
+    M0 = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
+    pos = pos.contiguous()
+    sens = sens.contiguous()
+    B0 = B0.contiguous()
+    t_B1 = t_B1.contiguous()
+    M0 = M0.contiguous()
     return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs)
 
 

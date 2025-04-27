@@ -22,24 +22,46 @@ def my_sinc(x):
     return result
 
 
-import torch
-
-
 @torch.jit.script
 def time_loop(
     Nt: int,
-    alpha: torch.Tensor,
-    beta: torch.Tensor,
-    alphaBar: torch.Tensor,
-    betaBar: torch.Tensor,
-    statea: torch.Tensor,
-    stateb: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
+    reAlpha: torch.Tensor,
+    reBeta: torch.Tensor,
+    imAlpha: torch.Tensor,
+    imBeta: torch.Tensor,
+    reStatea: torch.Tensor,
+    imStatea: torch.Tensor,
+    reStateb: torch.Tensor,
+    imStateb: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     for tt in range(Nt):
-        tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
-        stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
-        statea = tmpa
-    return statea, stateb
+        retmpa = (
+            reAlpha[:, tt] * reStatea
+            - imAlpha[:, tt] * imStatea
+            - (reBeta[:, tt] * reStateb + imBeta[:, tt] * imStateb)
+        )
+        imtmpa = (
+            reAlpha[:, tt] * imStatea
+            + imAlpha[:, tt] * reStatea
+            - (reBeta[:, tt] * imStateb - imBeta[:, tt] * reStateb)
+        )
+        retmpb = (
+            reBeta[:, tt] * reStatea
+            - imBeta[:, tt] * imStatea
+            + (reAlpha[:, tt] * reStateb + imAlpha[:, tt] * imStateb)
+        )
+        imtmpb = (
+            reBeta[:, tt] * imStatea
+            + imBeta[:, tt] * reStatea
+            + (reAlpha[:, tt] * imStateb - imAlpha[:, tt] * reStateb)
+        )
+        # tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
+        # stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
+        reStatea = retmpa
+        imStatea = imtmpa
+        reStateb = retmpb
+        imStateb = imtmpb
+    return (reStatea, imStatea, reStateb, imStateb)
 
 
 def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
@@ -102,20 +124,26 @@ def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
     bz = bz + B0.repeat(1, Nt)
 
     # Compute these out of loop
-    Phi = dt**2 * gam**2 * torch.abs(bxy) ** 2 + bz**2
-    Phi[Phi > 0] = torch.sqrt(Phi[Phi > 0])
+    normSquared = torch.abs(bxy) ** 2 + bz**2
+    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
+    Phi[normSquared > 0] = dt * gam * torch.sqrt(normSquared[normSquared > 0])
     sinc_part = -1j * gam * dt * 0.5 * my_sinc(Phi / 2)
     alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy * sinc_part
-    alphaBar = torch.conj(alpha)
-    betaBar = torch.conj(beta)
 
     # Loop over time
-    statea, stateb = time_loop(Nt, alpha, beta, alphaBar, betaBar, statea, stateb)
-    # for tt in range(Nt):
-    #     tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
-    #     stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
-    #     statea = tmpa
+    reStatea, imStatea, reStateb, imStateb = time_loop(
+        Nt,
+        torch.real(alpha),
+        torch.real(beta),
+        torch.imag(alpha),
+        torch.imag(beta),
+        torch.real(statea),
+        torch.imag(statea),
+        torch.real(stateb),
+        torch.imag(stateb),
+    )
+    statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
@@ -135,7 +163,8 @@ def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
 
     # Calculate final magnetization
     stateaBar = torch.conj(statea)
+    statebBar = torch.conj(stateb)
     mxy = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
-    mz = mz0 * (torch.abs(statea) ** 2 - torch.abs(stateb) ** 2) - 2 * torch.real(mxy0 * stateaBar * torch.conj(stateb))
+    mz = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
 
     return mxy, mz.real
