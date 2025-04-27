@@ -6,7 +6,7 @@ from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs(tfactor=3):
+def get_fixed_inputs(tfactor=1):
     Nz = 4096
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
     inputs["returnallstates"] = False
