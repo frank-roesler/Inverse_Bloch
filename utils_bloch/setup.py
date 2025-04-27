@@ -6,10 +6,11 @@ from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs():
+def get_fixed_inputs(tfactor=3):
     Nz = 4096
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
     inputs["returnallstates"] = False
+    inputs["dtmb"] *= tfactor
     inputs["dt"] = inputs["dtmb"].item()
     dt = inputs["dt"]
     sens = torch.ones((Nz, 1), dtype=torch.complex64)

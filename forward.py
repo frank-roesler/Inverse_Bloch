@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from time import time
 
-path = "results/220425_Mixed_square/train_log.pt"
+path = "results/train_log.pt"
 
 target_z, target_xy = get_test_targets()
 
