@@ -30,7 +30,7 @@ class TrainLogger:
         self.export_json()
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if epoch <= 1000:
+        if epoch <= 200:
             return
         if not epoch % self.save_every == 0:
             return
@@ -73,7 +73,7 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig = plt.figure(figsize=(12, 7), constrained_layout=False)
+        self.fig = plt.figure(figsize=(11, 6), constrained_layout=False)
         spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
 
         # First row: 3 plots spanning the entire width
@@ -123,9 +123,10 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
         """plots info curves during training"""
-        fmin = torch.min(fAx).item()
-        fmax = torch.max(fAx).item()
         if epoch % self.output_every == 0:
+            fAx = fAx.cpu()[:, 2]
+            fmin = -0.07  # torch.min(fAx).item()
+            fmax = 0.07  # torch.max(fAx).item()
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
@@ -137,7 +138,7 @@ class InfoScreen:
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
             phasemin = np.min(phase)
             phasemax = np.max(phase)
-            phase[target_xy < 0.5] = np.nan
+            phase[tgt_xy < 0.5] = np.nan
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
             self.ax_bottom_right.set_xlim(fmin, fmax)
@@ -260,7 +261,7 @@ def init_training(model, lr, device=torch.device("cpu")):
 def threshold_loss(x, threshold):
     threshold_loss = torch.max(torch.abs(x)) - threshold
     threshold_loss[threshold_loss < 0] = 0.0
-    return threshold_loss**2
+    return threshold_loss
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
@@ -269,9 +270,33 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     L2_loss_mz = torch.mean((z_profile - tgt_z) ** 2)
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
-    pulse_height_loss = threshold_loss(pulse, 0.03)
-    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 100)
-    return (L2_loss_mxy, L2_loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss)
+    pulse_height_loss = threshold_loss(pulse, 0.016)
+    # pulse_height_loss = torch.max(torch.abs(pulse))
+    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 1)
+    phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
+    phase_ddiff = torch.diff(phase_diff)
+    phase_ddiff = phase_ddiff[tgt_xy[1:-1] < 0.5]
+    phase_loss = torch.mean(phase_ddiff**2)
+    print("-" * 50)
+    print("LOSSES:")
+    print("L2_loss_mxy", L2_loss_mxy.item())
+    print("L2_loss_mz", L2_loss_mz.item())
+    print("boundary_vals_pulse", boundary_vals_pulse.item())
+    print("gradient_height_loss", gradient_height_loss.item())
+    print("pulse_height_loss", pulse_height_loss.item())
+    print("gradient_diff_loss", gradient_diff_loss.item())
+    print("phase_loss", phase_loss.item())
+    print("-" * 50)
+
+    return (
+        L2_loss_mxy,
+        L2_loss_mz,
+        100 * boundary_vals_pulse,
+        gradient_height_loss,
+        pulse_height_loss,
+        gradient_diff_loss,
+        phase_loss,
+    )
 
 
 def load_data(path):
@@ -286,4 +311,20 @@ def load_data(path):
     targets = data_dict["targets"]
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient, inputs, targets
+    return pulse, gradient
+
+
+def torch_unwrap(phase, discont=torch.pi):
+    """
+    Unwrap a tensor of phase angles to remove discontinuities.
+    Args:
+        phase (torch.Tensor): Input tensor of phase angles.
+        discont (float): Discontinuity threshold (default: π).
+    Returns:
+        torch.Tensor: Unwrapped phase tensor.
+    """
+    diff = torch.diff(phase)
+    diff_mod = (diff + torch.pi) % (2 * torch.pi) - torch.pi
+    diff_mod[diff_mod == -torch.pi] = torch.pi
+    phase_unwrapped = torch.cumsum(torch.cat((phase[..., :1], diff_mod), dim=-1), dim=-1)
+    return phase_unwrapped
