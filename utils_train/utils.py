@@ -261,7 +261,7 @@ def init_training(model, lr, device=torch.device("cpu")):
 def threshold_loss(x, threshold):
     threshold_loss = torch.max(torch.abs(x)) - threshold
     threshold_loss[threshold_loss < 0] = 0.0
-    return threshold_loss**2
+    return threshold_loss
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
@@ -271,14 +271,14 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
     pulse_height_loss = threshold_loss(pulse, 0.016)
-    # pulse_height_loss = torch.mean(torch.abs(pulse)**10)
+    # pulse_height_loss = torch.max(torch.abs(pulse))
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 1)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
-    # phase_loss = torch.mean(phase_diff**2)
     phase_ddiff = torch.diff(phase_diff)
     phase_ddiff = phase_ddiff[tgt_xy[1:-1] < 0.5]
     phase_loss = torch.mean(phase_ddiff**2)
-
+    print("-" * 50)
+    print("LOSSES:")
     print("L2_loss_mxy", L2_loss_mxy.item())
     print("L2_loss_mz", L2_loss_mz.item())
     print("boundary_vals_pulse", boundary_vals_pulse.item())
@@ -286,13 +286,14 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     print("pulse_height_loss", pulse_height_loss.item())
     print("gradient_diff_loss", gradient_diff_loss.item())
     print("phase_loss", phase_loss.item())
+    print("-" * 50)
 
     return (
         L2_loss_mxy,
         L2_loss_mz,
         100 * boundary_vals_pulse,
         gradient_height_loss,
-        1000 * pulse_height_loss,
+        pulse_height_loss,
         gradient_diff_loss,
         phase_loss,
     )

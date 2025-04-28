@@ -5,16 +5,15 @@ from params import *
 
 
 device = get_device()
-device = torch.device("cpu")
 target_z, target_xy = get_test_targets()
+target_xy = target_xy / np.sqrt(2)
+target_z = torch.sqrt(1 - target_xy**2)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
 freq_offset = -297.3 * 4.7 / gam_hz_mt / 2  # center freq offset
 
-B0, sens, t_B1, inputs["pos"], target_z, target_xy = move_to(
-    (B0, sens, t_B1, inputs["pos"], target_z, target_xy), device
-)
+B0, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, M0, sens, t_B1, pos, target_z, target_xy), device)
 
 model = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
@@ -29,7 +28,7 @@ trainLogger = TrainLogger(save_every=logging_frequency)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    mxy, mz = blochsim_CK(B1=pulse, G=gradient, sens=sens, B0=B0 + freq_offset, **inputs)
+    mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offset, M0=M0, dt=dt)
 
     (
         L2_loss_mxy,
@@ -44,7 +43,7 @@ for epoch in range(epochs + 1):
         L2_loss_mxy
         + L2_loss_mz
         + gradient_height_loss
-        # + gradient_diff_loss
+        + gradient_diff_loss
         + pulse_height_loss
         + boundary_vals_pulse
         + phase_loss
@@ -53,10 +52,11 @@ for epoch in range(epochs + 1):
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)
     optimizer.step()
     scheduler.step(loss.item())
 
-    infoscreen.plot_info(epoch, losses, inputs["pos"], t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
     infoscreen.print_info(epoch, loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,

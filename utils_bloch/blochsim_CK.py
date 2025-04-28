@@ -12,9 +12,6 @@ import numpy as np
 import torch
 
 
-G3 = lambda Gz: torch.column_stack((0 * Gz.flatten(), 0 * Gz.flatten(), Gz.flatten()))
-
-
 def my_sinc(x):
     if x.device != torch.device("mps:0"):
         return torch.sinc(x / np.pi)
@@ -25,7 +22,49 @@ def my_sinc(x):
     return result
 
 
-def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
+@torch.jit.script
+def time_loop(
+    Nt: int,
+    reAlpha: torch.Tensor,
+    reBeta: torch.Tensor,
+    imAlpha: torch.Tensor,
+    imBeta: torch.Tensor,
+    reStatea: torch.Tensor,
+    imStatea: torch.Tensor,
+    reStateb: torch.Tensor,
+    imStateb: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    for tt in range(Nt):
+        retmpa = (
+            reAlpha[:, tt] * reStatea
+            - imAlpha[:, tt] * imStatea
+            - (reBeta[:, tt] * reStateb + imBeta[:, tt] * imStateb)
+        )
+        imtmpa = (
+            reAlpha[:, tt] * imStatea
+            + imAlpha[:, tt] * reStatea
+            - (reBeta[:, tt] * imStateb - imBeta[:, tt] * reStateb)
+        )
+        retmpb = (
+            reBeta[:, tt] * reStatea
+            - imBeta[:, tt] * imStatea
+            + (reAlpha[:, tt] * reStateb + imAlpha[:, tt] * imStateb)
+        )
+        imtmpb = (
+            reBeta[:, tt] * imStatea
+            + imBeta[:, tt] * reStatea
+            + (reAlpha[:, tt] * imStateb - imAlpha[:, tt] * reStateb)
+        )
+        # tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
+        # stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
+        reStatea = retmpa
+        imStatea = imtmpa
+        reStateb = retmpb
+        imStateb = imtmpb
+    return (reStatea, imStatea, reStateb, imStateb)
+
+
+def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
     """
     Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
 
@@ -62,14 +101,8 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
         Cayley-Klein parameter beta (final value or time series)
     """
     # Constants
-    G = G3(G)
+    G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
     gam = 267522.1199722082  # radians per sec per mT
-    dt = kwargs.get("dt", 6.4e-6)
-
-    # Handle M0 initialization
-    M0 = kwargs.get("M0", torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32, requires_grad=False))
-    if M0.ndim == 1:
-        M0 = M0.to(B1.device)
 
     # Get dimensions
     Ns = pos.shape[0]  # Number of spatial positions
@@ -97,14 +130,21 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
     sinc_part = -1j * gam * dt * 0.5 * my_sinc(Phi / 2)
     alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy * sinc_part
-    alphaBar = torch.conj(alpha)
-    betaBar = torch.conj(beta)
 
     # Loop over time
-    for tt in range(Nt):
-        tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
-        stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
-        statea = tmpa
+    reStatea, imStatea, reStateb, imStateb = time_loop(
+        Nt,
+        torch.real(alpha),
+        torch.real(beta),
+        torch.imag(alpha),
+        torch.imag(beta),
+        torch.real(statea),
+        torch.imag(statea),
+        torch.real(stateb),
+        torch.imag(stateb),
+    )
+    statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
+    stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
@@ -123,8 +163,6 @@ def blochsim_CK(B1, G, pos, sens, B0, **kwargs):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    stateaBar = torch.conj(statea)
-    statebBar = torch.conj(stateb)
     mxy = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
     mz = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
 

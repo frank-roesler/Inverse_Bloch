@@ -22,18 +22,24 @@ def get_fixed_inputs(tfactor=1):
     tAx = tAx.float()
     fAx = fAx.float()
     t_B1 = t_B1.float()
-    dx = (inputs["pos"][-1, 2] - inputs["pos"][0, 2]) / (len(inputs["pos"][:, 2]) - 1)
-    inputs["pos"] = torch.from_numpy(inputs["pos"]).to(torch.float32).detach().requires_grad_(False)
+    pos = torch.from_numpy(inputs["pos"]).to(torch.float32).detach().requires_grad_(False)
+    dx = (pos[-1, 2] - pos[0, 2]) / (len(pos[:, 2]) - 1)
+    inputs["pos"] = pos
     sens = sens.detach().requires_grad_(False)
     B0 = B0.detach().requires_grad_(False)
     tAx = tAx.detach().requires_grad_(False)
     fAx = fAx.detach().requires_grad_(False)
-    return (inputs, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1))
+    M0 = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
+    pos = pos.contiguous()
+    sens = sens.contiguous()
+    B0 = B0.contiguous()
+    t_B1 = t_B1.contiguous()
+    M0 = M0.contiguous()
+    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs)
 
 
 def get_test_targets():
-    inputs, dt, dx, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
-    pos = inputs["pos"]
+    pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
     target_xy = torch.zeros((len(fAx)), dtype=torch.float32, requires_grad=False)
     target_xy[pos[:, 2] > -0.025] = 1
     target_xy[pos[:, 2] > -0.005] = 0
@@ -43,8 +49,8 @@ def get_test_targets():
     return target_z, target_xy
 
 
-def get_smooth_targets(smoothness=1):
-    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
+def get_smooth_targets(inputs, smoothness=1):
+    pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
     G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
     B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
     mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
