@@ -22,7 +22,7 @@ if pre_train_inputs:
     model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr=1e-4, thr=1e-5, device=device)
 
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
-trainLogger = TrainLogger(save_every=logging_frequency)
+trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
@@ -50,7 +50,7 @@ for epoch in range(epochs + 1):
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=100)
     optimizer.step()
     scheduler.step(loss.item())
 

@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from time import time
 
-path = "results/260425_Mixed_randomFitBs=10/train_log.pt"
+path = "results/train_log.pt"
 
-target_z, target_xy = get_targets()
+target_z, target_xy = get_targets(flip_angle)
 
-B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-# B1, G = load_data(path)
+# B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
+# G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
+B1, G = load_data(path)
 
 plot_off_resonance(B1.numpy(), G.numpy(), pos, Nz, dt)
 

@@ -9,9 +9,9 @@ import json
 
 
 class TrainLogger:
-    def __init__(self, save_every=1):
+    def __init__(self, start_logging=1):
         self.log = {}
-        self.save_every = save_every
+        self.start_logging = start_logging
         self.best_loss = np.inf
 
     def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, inputs, targets, axes):
@@ -30,9 +30,7 @@ class TrainLogger:
         self.export_json()
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if epoch <= 200:
-            return
-        if not epoch % self.save_every == 0:
+        if epoch <= self.start_logging:
             return
         if not losses[-1] < 0.999 * self.best_loss:
             return
