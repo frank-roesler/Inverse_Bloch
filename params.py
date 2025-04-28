@@ -4,11 +4,12 @@ from utils_bloch.setup import *
 # TRAINING PARAMETERS:
 epochs = 10000
 lr = 2e-5
-plot_loss_frequency = 10  # plot every n epochs
+plot_loss_frequency = 1  # plot every n epochs
 logging_frequency = 1  # save every n epochs
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
 # BLOCH PARAMETERS:
+flip_angle = np.pi / 4
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
 
 # MODEL PARAMETERS:

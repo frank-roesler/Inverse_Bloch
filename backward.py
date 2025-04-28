@@ -5,9 +5,7 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy = get_test_targets()
-target_xy = target_xy / np.sqrt(2)
-target_z = torch.sqrt(1 - target_xy**2)
+target_z, target_xy = get_targets(theta=flip_angle)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
