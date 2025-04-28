@@ -8,7 +8,7 @@ from time import time
 
 path = "results/260425_Mixed_randomFitBs=10/train_log.pt"
 
-target_z, target_xy = get_test_targets()
+target_z, target_xy = get_targets()
 
 B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
 G = torch.from_numpy(inputs["Gs"]).to(torch.float32)

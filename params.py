@@ -4,7 +4,7 @@ from utils_bloch.setup import *
 # TRAINING PARAMETERS:
 epochs = 10000
 lr = 2e-5
-plot_loss_frequency = 1  # plot every n epochs
+plot_loss_frequency = 100  # plot every n epochs
 logging_frequency = 1  # save every n epochs
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
