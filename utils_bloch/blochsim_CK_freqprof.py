@@ -45,6 +45,9 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
         print(f"  Simulating frequency offset {ff + 1} / {Nfreq} ({freq_offsets_Hz[ff]:.2f} Hz)")
 
         B0_total_this_freq = B0_base + B0_freq_offsets_mT[ff]
+
+        print(np.max(B0_total_this_freq).item())
+
         bz = bz_grad_component + np.tile(B0_total_this_freq, (Nt, 1)).T
 
         statea = np.ones((Ns,), dtype=complex)

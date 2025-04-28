@@ -282,8 +282,8 @@ def load_data(path):
     # losses = data_dict["losses"]
     # model = data_dict["model"]
     # optimizer = data_dict["optimizer"]
-    # inputs = data_dict["inputs"]
-    # targets = data_dict["targets"]
+    inputs = data_dict["inputs"]
+    targets = data_dict["targets"]
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient
+    return pulse, gradient, inputs, targets
