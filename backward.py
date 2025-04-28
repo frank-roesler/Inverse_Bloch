@@ -6,6 +6,8 @@ from params import *
 
 device = get_device()
 target_z, target_xy = get_test_targets()
+target_xy = target_xy / np.sqrt(2)
+target_z = torch.sqrt(1 - target_xy**2)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
@@ -50,6 +52,7 @@ for epoch in range(epochs + 1):
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)
     optimizer.step()
     scheduler.step(loss.item())
 

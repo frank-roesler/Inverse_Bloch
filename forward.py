@@ -10,11 +10,11 @@ path = "results/train_log.pt"
 
 target_z, target_xy = get_test_targets()
 
-B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-# B1, G = load_data(path)
+# B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
+# G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
+B1, G = load_data(path)
 
-# plot_off_resonance(B1.numpy(), G.numpy(), pos, Nz, dt)
+plot_off_resonance(B1.numpy(), G.numpy(), pos, Nz, dt)
 
 mxy, mz = blochsim_CK(B1=B1, G=G, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt)
 

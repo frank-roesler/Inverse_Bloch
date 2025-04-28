@@ -144,6 +144,7 @@ def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
         torch.imag(stateb),
     )
     statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
+    stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
@@ -162,8 +163,6 @@ def blochsim_CK(B1, G, pos, sens, B0, M0, dt=6.4e-6):
             mz0 = M0[:, 2]
 
     # Calculate final magnetization
-    stateaBar = torch.conj(statea)
-    statebBar = torch.conj(stateb)
     mxy = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
     mz = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
 
