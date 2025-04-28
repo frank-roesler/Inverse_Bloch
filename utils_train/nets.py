@@ -19,7 +19,7 @@ def get_model(model_name, **kwargs):
 
 
 class PulseGradientBase(nn.Module):
-    def __init__(self, gradient_scale=200.0, tmin=None, tmax=None, output_dim=3, **kwargs):
+    def __init__(self, gradient_scale, tmin=None, tmax=None, output_dim=3, **kwargs):
         super(PulseGradientBase, self).__init__()
         self.gradient_scale = gradient_scale
         self.tmin = tmin
@@ -68,7 +68,7 @@ class FourierPulse(nn.Module):
         super().__init__()
         self.tpulse = t_max - t_min
         p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
-        weights = torch.exp(-0.1 * (torch.arange(-n_coeffs, n_coeffs + 1)) ** 2)
+        weights = torch.exp(-((torch.arange(-n_coeffs, n_coeffs + 1)) ** 2))
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
         self.k = torch.arange(-n_coeffs, n_coeffs + 1, requires_grad=False).unsqueeze(0)

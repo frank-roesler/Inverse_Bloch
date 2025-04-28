@@ -148,10 +148,7 @@ class InfoScreen:
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim(
-                (
-                    -1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
-                    1.1 * np.max(np.sqrt(pulse_real**2 + pulse_imag**2)),
-                )
+                (-np.max(np.sqrt(pulse_real**2 + pulse_imag**2)), np.max(np.sqrt(pulse_real**2 + pulse_imag**2)))
             )
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
             self.ax[1].set_ylim(
@@ -251,7 +248,7 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, min_lr=5e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=5e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -259,7 +256,7 @@ def init_training(model, lr, device=torch.device("cpu")):
 def threshold_loss(x, threshold):
     threshold_loss = torch.max(torch.abs(x)) - threshold
     threshold_loss[threshold_loss < 0] = 0.0
-    return threshold_loss
+    return threshold_loss**2
 
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
@@ -273,27 +270,28 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 1)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_ddiff = torch.diff(phase_diff)
-    phase_ddiff = phase_ddiff[tgt_xy[1:-1] < 0.5]
-    phase_loss = torch.mean(phase_ddiff**2)
+    phase_ddiff = phase_ddiff[tgt_xy[1:-1] > 1e-6]
+    phase_diff_var = torch.var(phase_diff[tgt_xy[:-1] > 1e-6])
+    phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
     print("-" * 50)
     print("LOSSES:")
     print("L2_loss_mxy", L2_loss_mxy.item())
     print("L2_loss_mz", L2_loss_mz.item())
-    print("boundary_vals_pulse", boundary_vals_pulse.item())
-    print("gradient_height_loss", gradient_height_loss.item())
-    print("pulse_height_loss", pulse_height_loss.item())
+    print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
+    print("gradient_height_loss", gradient_height_loss.item() / 10)
+    print("pulse_height_loss", pulse_height_loss.item() * 100)
     print("gradient_diff_loss", gradient_diff_loss.item())
-    print("phase_loss", phase_loss.item())
+    print("phase_loss", phase_loss.item() * 10)
     print("-" * 50)
 
     return (
         L2_loss_mxy,
         L2_loss_mz,
         100 * boundary_vals_pulse,
-        gradient_height_loss,
-        pulse_height_loss,
+        gradient_height_loss / 10,
+        100 * pulse_height_loss,
         gradient_diff_loss,
-        phase_loss,
+        10 * phase_loss,
     )
 
 
