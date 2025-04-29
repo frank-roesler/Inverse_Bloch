@@ -1,6 +1,7 @@
 from utils_train.nets import get_model
 from utils_train.utils import *
 from utils_bloch.blochsim_CK import blochsim_CK
+from utils_bloch.setup import get_targets
 from params import *
 
 
@@ -50,7 +51,7 @@ for epoch in range(epochs + 1):
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=100)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)
     optimizer.step()
     scheduler.step(loss.item())
 

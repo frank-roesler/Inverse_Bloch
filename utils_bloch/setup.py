@@ -41,9 +41,9 @@ def get_fixed_inputs(tfactor=1):
 def get_targets(theta=0.0):
     pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
     target_xy = torch.zeros((len(fAx)), dtype=torch.float32, requires_grad=False)
-    target_xy[pos[:, 2] > -0.025] = np.cos(theta)
+    target_xy[pos[:, 2] > -0.025] = np.sin(theta)
     target_xy[pos[:, 2] > -0.005] = 0
-    target_xy[pos[:, 2] > 0.005] = np.cos(theta)
+    target_xy[pos[:, 2] > 0.005] = np.sin(theta)
     target_xy[pos[:, 2] > 0.025] = 0
     target_z = torch.sqrt(1 - target_xy**2)
     return target_z, target_xy
