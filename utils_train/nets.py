@@ -85,8 +85,8 @@ class FourierPulse(nn.Module):
 
 class FourierSeries(PulseGradientBase):
     def __init__(self, tmin, tmax, n_coeffs=101, output_dim=3, **kwargs):
-        super().__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
-        self.pulses = nn.ModuleList([FourierPulse(tmin, tmax, length=n_coeffs) for _ in range(output_dim)])
+        super().__init__(tmin=None, tmax=None, output_dim=output_dim, **kwargs)
+        self.pulses = nn.ModuleList([FourierPulse(tmin, tmax, n_coeffs=n_coeffs) for _ in range(output_dim)])
         self.name = "FourierSeries"
 
     def to(self, device):

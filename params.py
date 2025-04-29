@@ -4,13 +4,13 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = 2e-5
+lr = 2e-3
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 1000  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
 # BLOCH PARAMETERS:
-flip_angle = 0.3 * np.pi
+flip_angle = 0.5 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
 
 # MODEL PARAMETERS:
