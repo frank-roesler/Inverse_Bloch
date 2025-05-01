@@ -1,4 +1,3 @@
-from utils_bloch.blochsim_batch import blochsim_CK_batch
 from utils_bloch.setup import get_targets
 from utils_train.utils import *
 import numpy as np

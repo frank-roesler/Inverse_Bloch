@@ -218,4 +218,4 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
 
     # Adjust layout and show the plot
     plt.tight_layout()
-    # plt.show()
+    plt.show()

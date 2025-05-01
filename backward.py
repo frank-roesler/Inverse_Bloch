@@ -1,6 +1,7 @@
 from utils_train.nets import get_model
 from utils_train.utils import *
 from utils_bloch.blochsim_CK import blochsim_CK
+from utils_bloch.blochsim_batch import blochsim_CK_batch
 from utils_bloch.setup import get_targets
 from params import *
 
@@ -10,7 +11,12 @@ target_z, target_xy = get_targets(theta=flip_angle)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offset = -297.3 * 4.7 / gam_hz_mt / 2  # center freq offset
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7 / gam_hz_mt, 0.0, 5)
+B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
+B0_list = []
+for ff in range(len(freq_offsets_Hz)):
+    B0_list.append(B0 + B0_freq_offsets_mT[ff])
+B0 = torch.stack(B0_list, dim=0).to(torch.float32)
 
 B0, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, M0, sens, t_B1, pos, target_z, target_xy), device)
 
@@ -27,26 +33,29 @@ trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offset, M0=M0, dt=dt)
+    # mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offset, M0=M0, dt=dt)
+    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0, M0=M0, dt=dt)
 
-    (
-        L2_loss_mxy,
-        L2_loss_mz,
-        boundary_vals_pulse,
-        gradient_height_loss,
-        pulse_height_loss,
-        gradient_diff_loss,
-        phase_loss,
-    ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-    loss = (
-        L2_loss_mxy
-        + L2_loss_mz
-        + gradient_height_loss
-        + gradient_diff_loss
-        + pulse_height_loss
-        + boundary_vals_pulse
-        + phase_loss
-    )
+    loss = torch.tensor([0.0], device=device)
+    for ff in range(len(freq_offsets_Hz)):
+        (
+            L2_loss_mxy,
+            L2_loss_mz,
+            boundary_vals_pulse,
+            gradient_height_loss,
+            pulse_height_loss,
+            gradient_diff_loss,
+            phase_loss,
+        ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
+        loss += (
+            L2_loss_mxy
+            + L2_loss_mz
+            + gradient_height_loss
+            + gradient_diff_loss
+            + pulse_height_loss
+            + boundary_vals_pulse
+            + phase_loss
+        )
 
     losses.append(loss.item())
     optimizer.zero_grad()
@@ -55,7 +64,7 @@ for epoch in range(epochs + 1):
     optimizer.step()
     scheduler.step(loss.item())
 
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[3, :], mxy[3, :], pulse, gradient)
     infoscreen.print_info(epoch, loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,
