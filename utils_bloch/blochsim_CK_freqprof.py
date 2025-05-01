@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import linspace, squeeze, angle, unwrap
+from utils_bloch.blochsim_batch import blochsim_CK_batch
+import torch
 
 G3 = lambda Gz: np.column_stack((0 * Gz.flatten(), 0 * Gz.flatten(), Gz.flatten()))
 
 
 def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
+    G = G3(G)
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
     dt = 6.4e-6
@@ -81,9 +84,31 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
     return mxy_profile, mz_profile
 
 
-def plot_off_resonance(rf, grad, pos, Nz, dt, npts=512):
-    [mxy_profile, mz_profile] = blochsim_CK_freqprof(
-        rf, G3(grad), pos, np.ones((Nz, 1)), np.zeros((Nz, 1)), dt=dt, freq_offsets_Hz=linspace(-8000, 8000, npts)
+def blochsim_CK_freqprof2(B1, G, pos, sens, B0, freq_offsets_Hz, dt, M0=torch.Tensor([0, 0, 1]), **kwargs):
+    B1 = torch.from_numpy(B1).to(torch.complex64)
+    G = torch.from_numpy(G).to(torch.float32)
+    pos = torch.from_numpy(pos).to(torch.float32)
+    sens = torch.from_numpy(sens).to(torch.complex64)
+    B0 = torch.from_numpy(B0).to(torch.float32)
+    M0 = torch.from_numpy(M0).to(torch.float32)
+    gam = 267522.1199722082
+    gam_hz_mt = gam / (2 * np.pi)
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
+    B0_list = []
+    for ff in range(len(freq_offsets_Hz)):
+        B0_list.append(B0 + B0_freq_offsets_mT[ff])
+
+    B0 = torch.stack(B0_list, dim=0).to(torch.float32)
+    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=sens, B0_list=B0, M0=M0, dt=dt)
+    return mxy.permute(1, 0).numpy(), mz.permute(1, 0).numpy()
+
+
+def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
+    from params import flip_angle
+
+    npts = len(freq_offsets_Hz)
+    [mxy_profile, mz_profile] = blochsim_CK_freqprof2(
+        rf, grad, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt, freq_offsets_Hz=freq_offsets_Hz
     )
 
     # Create figure and subplots
@@ -100,7 +125,7 @@ def plot_off_resonance(rf, grad, pos, Nz, dt, npts=512):
         ],
         aspect="auto",
         vmin=0,
-        vmax=np.max(np.abs(mxy_profile)),
+        vmax=np.sin(flip_angle),
     )
     axes[0, 0].set_xlabel("Off Resonance [ppm]")
     axes[0, 0].set_ylabel("Spatial Pos [cm]")
@@ -138,7 +163,7 @@ def plot_off_resonance(rf, grad, pos, Nz, dt, npts=512):
         ],
         aspect="auto",
         vmax=1,
-        vmin=np.min(np.abs(mz_profile)),
+        vmin=np.sin(flip_angle),
     )
     axes[0, 2].set_xlabel("Off Resonance [ppm]")
     axes[0, 2].set_ylabel("Spatial Pos [cm]")
@@ -185,4 +210,4 @@ def plot_off_resonance(rf, grad, pos, Nz, dt, npts=512):
 
     # Adjust layout and show the plot
     plt.tight_layout()
-    plt.show()
+    # plt.show()
