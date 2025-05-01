@@ -8,7 +8,11 @@ G3 = lambda Gz: np.column_stack((0 * Gz.flatten(), 0 * Gz.flatten(), Gz.flatten(
 
 
 def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
-    G = G3(G)
+    G = G3(G.cpu().numpy())
+    B1 = B1.cpu().numpy()
+    pos = pos.cpu().numpy()
+    sens = sens.cpu().numpy()
+    B0 = B0.cpu().numpy()
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
     dt = 6.4e-6
@@ -19,9 +23,16 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
     if "dt" in kwargs:
         dt = kwargs["dt"]
     if "M0" in kwargs:
-        M0 = np.array(kwargs["M0"])
+        if isinstance(kwargs["M0"], torch.Tensor):
+            M0 = kwargs["M0"].cpu().numpy()
+        else:
+            M0 = np.array(kwargs["M0"])
+
     if "freq_offsets_Hz" in kwargs:
-        freq_offsets_Hz = np.array(kwargs["freq_offsets_Hz"])
+        if isinstance(kwargs["freq_offsets_Hz"], torch.Tensor):
+            freq_offsets_Hz = kwargs["freq_offsets_Hz"].cpu().numpy()
+        else:
+            freq_offsets_Hz = np.array(kwargs["freq_offsets_Hz"])
 
     Ns = pos.shape[0]
     Nt = G.shape[0]
@@ -85,12 +96,6 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, **kwargs):
 
 
 def blochsim_CK_freqprof2(B1, G, pos, sens, B0, freq_offsets_Hz, dt, M0=torch.Tensor([0, 0, 1]), **kwargs):
-    B1 = torch.from_numpy(B1).to(torch.complex64)
-    G = torch.from_numpy(G).to(torch.float32)
-    pos = torch.from_numpy(pos).to(torch.float32)
-    sens = torch.from_numpy(sens).to(torch.complex64)
-    B0 = torch.from_numpy(B0).to(torch.float32)
-    M0 = torch.from_numpy(M0).to(torch.float32)
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
     B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
@@ -100,7 +105,7 @@ def blochsim_CK_freqprof2(B1, G, pos, sens, B0, freq_offsets_Hz, dt, M0=torch.Te
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
     mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=sens, B0_list=B0, M0=M0, dt=dt)
-    return mxy.permute(1, 0).numpy(), mz.permute(1, 0).numpy()
+    return mxy.permute(1, 0), mz.permute(1, 0)
 
 
 def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
@@ -110,6 +115,9 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
     [mxy_profile, mz_profile] = blochsim_CK_freqprof2(
         rf, grad, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt, freq_offsets_Hz=freq_offsets_Hz
     )
+    mxy_profile = mxy_profile.detach().cpu().numpy() if isinstance(mxy_profile, torch.Tensor) else mxy_profile
+    mz_profile = mz_profile.detach().cpu().numpy() if isinstance(mz_profile, torch.Tensor) else mz_profile
+    pos = pos.detach().cpu().numpy() if isinstance(pos, torch.Tensor) else pos
 
     # Create figure and subplots
     fig, axes = plt.subplots(2, 3, figsize=(12, 6))

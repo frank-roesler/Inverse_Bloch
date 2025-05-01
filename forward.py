@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from time import time
 
-path = "results/280425_Mixed_square_flipAngle45/train_log.pt"
+path = "results/150425_MLP_square2/train_log.pt"
 
 target_z, target_xy = get_targets(flip_angle)
 
@@ -15,15 +15,18 @@ target_z, target_xy = get_targets(flip_angle)
 # G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
 B1, G = load_data(path)
 
-npts = 8
+npts = 16
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
 freq_offsets_Hz = torch.linspace(-8000, 8000, npts)
 
-t0 = time()
-plot_off_resonance(
-    B1.numpy(), G.numpy(), pos.numpy(), sens.numpy(), dt, B0=B0.numpy(), M0=M0.numpy(), freq_offsets_Hz=freq_offsets_Hz
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Device:", device)
+freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy = move_to(
+    (freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy), device
 )
+t0 = time()
+plot_off_resonance(B1, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
 print("Time:", time() - t0)
 
 # B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
