@@ -16,15 +16,15 @@ pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries
 model_args = {
-    "n_coeffs": 35,  # Fourier Series
-    "omega_0": 2.5,  # SIREN
-    "hidden_dim": 64,#128,#128,  # MLP, SIREN
-    "num_layers": 16,#16,  # MLP, SIREN
+    "n_coeffs": 70,#60,#35,#35,  # Fourier Series
+    "omega_0": 3.0,  # SIREN (2.5)
+    "hidden_dim": 64,#128,#128,  # MLP (128), SIREN (64)
+    "num_layers": 16,#16,  # MLP (16), SIREN (16)
     "num_centers": 30,  # RBFN
     "center_spacing": 5,  # RBFN
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 1000.0,  # FourierMLP
-    "gradient_scale": 20,#100.0,  # relative size of gradient to RF pulse
+    "gradient_scale": 20,#20,#100.0,  # relative size of gradient to RF pulse (20)
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),
 }
