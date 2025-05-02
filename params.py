@@ -3,28 +3,28 @@ import numpy as np
 
 
 # TRAINING PARAMETERS:
-epochs = 10000
+epochs = 50000
 lr = 1e-4
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 
 # BLOCH PARAMETERS:
-flip_angle = 0.3 * np.pi
+flip_angle = 0.68 * np.pi/2
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries
 model_args = {
-    "n_coeffs": 30,  # Fourier Series
+    "n_coeffs": 35,  # Fourier Series
     "omega_0": 2.5,  # SIREN
-    "hidden_dim": 128,  # MLP, SIREN
-    "num_layers": 16,  # MLP, SIREN
-    "num_centers": 10,  # RBFN
-    "center_spacing": 1,  # RBFN
+    "hidden_dim": 64,#128,#128,  # MLP, SIREN
+    "num_layers": 16,#16,  # MLP, SIREN
+    "num_centers": 30,  # RBFN
+    "center_spacing": 5,  # RBFN
     "num_fourier_features": 51,  # FourierMLP
-    "frequency_scale": 100.0,  # FourierMLP
-    "gradient_scale": 100.0,  # relative size of gradient to RF pulse
+    "frequency_scale": 1000.0,  # FourierMLP
+    "gradient_scale": 20,#100.0,  # relative size of gradient to RF pulse
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),
 }

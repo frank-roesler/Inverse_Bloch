@@ -2,16 +2,17 @@ from utils_train.nets import get_model
 from utils_train.utils import *
 from utils_bloch.blochsim_CK import blochsim_CK
 from utils_bloch.blochsim_batch import blochsim_CK_batch
-from utils_bloch.setup import get_targets
+from utils_bloch.setup import get_targets, get_smooth_targets
 from params import *
 
 
 device = get_device()
 target_z, target_xy = get_targets(theta=flip_angle)
+target_xy, target_ph, target_z = get_smooth_targets( smoothness=2 )
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7 / gam_hz_mt, 0.0, 5)
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
 B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
 B0_list = []
 for ff in range(len(freq_offsets_Hz)):
