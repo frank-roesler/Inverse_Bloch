@@ -6,7 +6,7 @@ from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs(tfactor=1):
+def get_fixed_inputs(tfactor=2.0):
     Nz = 4096
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
     inputs["returnallstates"] = False
@@ -49,13 +49,14 @@ def get_targets(theta=0.0):
     return target_z, target_xy
 
 
-def get_smooth_targets(inputs, smoothness=1):
+def get_smooth_targets(smoothness=1):
     pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
-    G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-    mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
-    targAbsMxy, targPhMxy, targMz = buildTarget(mxy, mz, B1, dt, bwTB=1.8, sharpnessTB=smoothness, phSlopReduction=1)
+    #G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
+    #B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
+    mz, mxy = get_targets( np.pi/2 )
+    #mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
+    targAbsMxy, targPhMxy, targMz = buildTarget(mxy, mz, fAx, dt, bwTB=0.1, sharpnessTB=smoothness, phSlopReduction=1)
     targAbsMxy = torch.from_numpy(targAbsMxy).to(torch.float32).requires_grad_(False)
     targPhMxy = torch.from_numpy(targPhMxy).to(torch.float32).requires_grad_(False)
     targMz = torch.from_numpy(targMz).to(torch.float32).requires_grad_(False)
-    return (targAbsMxy, targPhMxy, targMz)
+    return targAbsMxy, targPhMxy, targMz

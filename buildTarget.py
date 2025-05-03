@@ -29,7 +29,7 @@ def buildTarget(mxy, mz, B1, dt, bwTB, sharpnessTB, phSlopReduction):
     B1 = np.asarray(B1)
 
     # Time and frequency axes setup [cite: 3]
-    tAx = np.linspace(0, (len(B1) - 1) * dt, len(mz))
+    tAx = np.linspace(0, (len(B1) - 1) * dt, len(B1))
     # Ensure tAx is not zero to avoid division by zero
     max_tAx = np.max(tAx)
     if max_tAx == 0:
@@ -45,7 +45,8 @@ def buildTarget(mxy, mz, B1, dt, bwTB, sharpnessTB, phSlopReduction):
     # Also, the threshold calculation differs slightly in interpretation.
     radDistXY = np.max(np.diff(np.abs(mxy)))
     # Need to handle potential division by zero or negative values inside abs if abs(mxy) is close to 0.5
-    peaks_input_xy = np.abs(1.0 / (np.abs(mxy) - 0.5 + 1e-9))  # Added small epsilon to avoid division by zero
+    # peaks_input_xy = np.abs(1.0 / (np.abs(mxy) - 0.5 + 1e-9))  # Added small epsilon to avoid division by zero
+    peaks_input_xy = np.abs(np.diff( np.abs(mxy) ))  # Added small epsilon to avoid division by zero
     locsXY, _ = find_peaks(peaks_input_xy, threshold=radDistXY)
     # Reshaping assumes an even number of peaks found, grouped in pairs. Error handling might be needed.
     if len(locsXY) % 2 != 0:
@@ -56,7 +57,8 @@ def buildTarget(mxy, mz, B1, dt, bwTB, sharpnessTB, phSlopReduction):
         idxPosXY = locsXY.reshape((-1, 2)).T  # Reshape into pairs [cite: 4]
 
     radDistZ = np.max(np.diff(np.abs(mz)))
-    peaks_input_z = np.abs(1.0 / (np.abs(mz) - 0.5 + 1e-9))  # Added small epsilon
+    #peaks_input_z = np.abs(1.0 / (np.abs(mz) - 0.5 + 1e-9))  # Added small epsilon
+    peaks_input_z = np.abs( np.diff( np.abs(mz) ) )  # Added small epsilon
     locsZ, _ = find_peaks(peaks_input_z, threshold=radDistZ)
     if len(locsZ) % 2 != 0:
         print("Warning: Odd number of peaks found for Mz. Reshaping might fail or be incorrect.")

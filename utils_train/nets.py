@@ -45,7 +45,8 @@ class MixedModel(PulseGradientBase):
         self.name = "MixedModel"
         self.model1 = FourierPulse(tmin, tmax, **kwargs)
         self.model2 = FourierPulse(tmin, tmax, **kwargs)
-        self.model3 = MLP(**kwargs, output_dim=1)
+        self.model3 = SIREN(**kwargs, output_dim=1)
+        #self.model3 = MLP(**kwargs, output_dim=1)
 
     def to(self, device):
         self.model1 = self.model1.to(device)
@@ -108,6 +109,7 @@ class MLP(PulseGradientBase):
         for _ in range(num_layers - 1):
             layers += [nn.Linear(hidden_dim, hidden_dim), nn.Softplus(beta=10)]
         layers += [nn.Linear(hidden_dim, output_dim)]
+        #layers += [nn.Linear(hidden_dim, output_dim), nn.ReLU()]
         self.model = nn.Sequential(*layers)
         self._initialize_weights()
 
@@ -133,7 +135,8 @@ class SIREN(PulseGradientBase):
         self.layers.append(nn.Linear(input_dim, hidden_dim))
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-        self.final_layer = nn.Linear(hidden_dim, output_dim)
+        #self.final_layer = nn.Linear(hidden_dim, output_dim)
+        self.final_layer = nn.Sequential( nn.Linear(hidden_dim, output_dim), nn.Softplus() )
 
     def forward(self, x):
         x_orig = x.clone()

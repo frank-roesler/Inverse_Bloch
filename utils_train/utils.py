@@ -264,7 +264,7 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     L1_loss_mxy = torch.mean(torch.abs(xy_profile_abs - tgt_xy))
     L1_loss_mz = torch.mean(torch.abs(z_profile - tgt_z))
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
-    gradient_height_loss = threshold_loss(gradient, 50)
+    gradient_height_loss = threshold_loss(gradient, 60 * 2.0)
     pulse_height_loss = threshold_loss(pulse, 0.016)
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 1)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
@@ -290,7 +290,7 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
         gradient_height_loss / 10,
         100 * pulse_height_loss,
         gradient_diff_loss,
-        10 * phase_loss,
+        20 * phase_loss,
     )
 
 
