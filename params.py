@@ -4,7 +4,7 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = 1e-3
+lr = 5e-4
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient

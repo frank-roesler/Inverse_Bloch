@@ -40,13 +40,14 @@ class PulseGradientBase(nn.Module):
 
 
 class MixedModel(PulseGradientBase):
-    def __init__(self, tmin=None, tmax=None, **kwargs):
+    def __init__(self, tmin=None, tmax=None, positive_gradient=True, **kwargs):
         super(MixedModel, self).__init__(tmin=tmin, tmax=tmax, **kwargs)
         self.name = "MixedModel"
+        self.positive_gradient = positive_gradient
         self.model1 = FourierPulse(tmin, tmax, **kwargs)
         self.model2 = FourierPulse(tmin, tmax, **kwargs)
         self.model3 = SIREN(**kwargs, output_dim=1)
-        #self.model3 = MLP(**kwargs, output_dim=1)
+        # self.model3 = MLP(**kwargs, output_dim=1)
 
     def to(self, device):
         self.model1 = self.model1.to(device)
@@ -55,9 +56,10 @@ class MixedModel(PulseGradientBase):
         return super().to(device)
 
     def forward(self, x):
+        out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
         out1 = self.model1(x)
         out2 = self.model2(x)
-        out3 = self.gradient_scale * self.model3(x)
+        out3 = self.gradient_scale * out_sign(self.model3(x))
         pulse = out1 + 1j * out2
         gradient = out3
         return pulse, gradient
@@ -105,11 +107,10 @@ class MLP(PulseGradientBase):
     def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, tmin=None, tmax=None, **kwargs):
         super(MLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.name = "MLP"
-        layers = [nn.Linear(input_dim, hidden_dim), nn.Softplus(beta=10)]
+        layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
         for _ in range(num_layers - 1):
-            layers += [nn.Linear(hidden_dim, hidden_dim), nn.Softplus(beta=10)]
+            layers += [nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
         layers += [nn.Linear(hidden_dim, output_dim)]
-        #layers += [nn.Linear(hidden_dim, output_dim), nn.ReLU()]
         self.model = nn.Sequential(*layers)
         self._initialize_weights()
 
@@ -135,8 +136,8 @@ class SIREN(PulseGradientBase):
         self.layers.append(nn.Linear(input_dim, hidden_dim))
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-        #self.final_layer = nn.Linear(hidden_dim, output_dim)
-        self.final_layer = nn.Sequential( nn.Linear(hidden_dim, output_dim), nn.Softplus() )
+        # self.final_layer = nn.Linear(hidden_dim, output_dim)
+        self.final_layer = nn.Sequential(nn.Linear(hidden_dim, output_dim), nn.Softplus())
 
     def forward(self, x):
         x_orig = x.clone()
