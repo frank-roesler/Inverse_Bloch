@@ -247,8 +247,8 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
 def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=5e-6)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, amsgrad=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -261,8 +261,8 @@ def threshold_loss(x, threshold):
 
 def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
-    L2_loss_mz = torch.mean((z_profile - tgt_z) ** 2)
+    L1_loss_mxy = torch.mean(torch.abs(xy_profile_abs - tgt_xy))
+    L1_loss_mz = torch.mean(torch.abs(z_profile - tgt_z))
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
     pulse_height_loss = threshold_loss(pulse, 0.016)
@@ -274,8 +274,8 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
     # print("-" * 50)
     # print("LOSSES:")
-    # print("L2_loss_mxy", L2_loss_mxy.item())
-    # print("L2_loss_mz", L2_loss_mz.item())
+    # print("L1_loss_mxy", L1_loss_mxy.item())
+    # print("L1_loss_mz", L1_loss_mz.item())
     # print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
     # print("gradient_height_loss", gradient_height_loss.item() / 10)
     # print("pulse_height_loss", pulse_height_loss.item() * 100)
@@ -284,8 +284,8 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     # print("-" * 50)
 
     return (
-        L2_loss_mxy,
-        L2_loss_mz,
+        L1_loss_mxy,
+        L1_loss_mz,
         100 * boundary_vals_pulse,
         gradient_height_loss / 10,
         100 * pulse_height_loss,

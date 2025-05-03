@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from abc import abstractmethod
+import torch.nn.init as init
 
 
 def get_model(model_name, **kwargs):
@@ -12,6 +12,7 @@ def get_model(model_name, **kwargs):
         "RBFN": RBFN,
         "FourierMLP": FourierMLP,
         "MixedModel": MixedModel,
+        "ModulatedFourier": ModulatedFourier,
     }
     if model_name not in model_dict:
         raise ValueError(f"Model {model_name} is not supported.")
@@ -103,9 +104,9 @@ class MLP(PulseGradientBase):
     def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, tmin=None, tmax=None, **kwargs):
         super(MLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.name = "MLP"
-        layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
+        layers = [nn.Linear(input_dim, hidden_dim), nn.Softplus(beta=10)]
         for _ in range(num_layers - 1):
-            layers += [nn.Linear(hidden_dim, hidden_dim), nn.ReLU()]
+            layers += [nn.Linear(hidden_dim, hidden_dim), nn.Softplus(beta=10)]
         layers += [nn.Linear(hidden_dim, output_dim)]
         self.model = nn.Sequential(*layers)
         self._initialize_weights()
@@ -181,4 +182,27 @@ class FourierMLP(PulseGradientBase):
         out = torch.matmul(x, self.fourier_weights.T)
         out = torch.cat([torch.sin(out), torch.cos(out)], dim=-1)
         out = self.model(out)
+        return self.model_output_to_pulse_gradient(out, x)
+
+
+class SineActivation(nn.Module):
+    def forward(self, x):
+        return torch.sin(x)
+
+
+class ModulatedFourier(PulseGradientBase):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, bandwidth=30, tmin=None, tmax=None, **kwargs):
+        super(ModulatedFourier, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
+        self.name = "ModulatedFourier"
+        self.output_dim = output_dim
+        linear = nn.Linear(input_dim, hidden_dim)
+        linear2 = nn.Linear(hidden_dim, output_dim)
+        init.uniform_(linear.weight, a=-bandwidth, b=bandwidth)
+        init.uniform_(linear.bias, a=-1, b=1)
+        init.uniform_(linear2.weight, a=-0.005, b=0.005)
+        init.uniform_(linear2.bias, a=-0.005, b=0.005)
+        self.layers1 = nn.Sequential(linear, SineActivation(), linear2)
+
+    def forward(self, x):
+        out = self.layers1(x)
         return self.model_output_to_pulse_gradient(out, x)
