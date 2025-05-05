@@ -8,7 +8,7 @@ from params import *
 
 device = get_device()
 # target_z, target_xy = get_targets(theta=flip_angle)
-target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=10000.0)
+target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid)
 
 
 gam = 267522.1199722082

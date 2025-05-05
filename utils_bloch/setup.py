@@ -1,8 +1,9 @@
 import scipy
 import torch
 import numpy as np
-from utils_bloch.blochsim_CK import blochsim_CK
-from buildTarget import buildTarget
+
+# from utils_bloch.blochsim_CK import blochsim_CK
+# from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
@@ -63,37 +64,28 @@ def get_targets(theta=0.0):
 #     return targAbsMxy, targPhMxy, targMz
 
 
-import torch
-
-
-def smooth_square_well_atan(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0):
-    """
-    Smooth approximation of a square well function using torch.atan with specified boundaries.
-
-    Parameters:
-        x (torch.Tensor): Input tensor.
-        left (float): Left boundary of the square well.
-        right (float): Right boundary of the square well.
-        depth (float): Depth of the square well (negative value for a well).
-        smoothness (float): Controls the smoothness of the edges (higher = sharper).
-
-    Returns:
-        torch.Tensor: Smooth square well function values.
-    """
-    left_transition = 0.5 * (1 + 2 * torch.atan(smoothness * (x - left)) / torch.pi)
-    right_transition = 0.5 * (1 + 2 * torch.atan(smoothness * (right - x)) / torch.pi)
+def smooth_square_well(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0, function=torch.sigmoid):
+    step_left = function(smoothness * (x - left))
+    step_right = function(smoothness * (right - x))
+    left_transition = step_left
+    right_transition = step_right
+    if function == torch.atan:
+        left_transition = 0.5 * (1 + 2 * step_left / torch.pi)
+        right_transition = 0.5 * (1 + 2 * step_right / torch.pi)
     well = depth * (left_transition * right_transition)
     return well
 
 
-def get_smooth_targets(theta=np.pi / 2, smoothness=1):
+def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid):
+    """higher smoothness values give sharper transitions"""
     import params
 
-    left_slice = smooth_square_well_atan(
-        params.pos[:, 2], left=-0.025, right=-0.005, depth=np.sin(theta), smoothness=smoothness
+    smoothness *= 1000.0
+    left_slice = smooth_square_well(
+        params.pos[:, 2], left=-0.025, right=-0.005, depth=np.sin(theta), smoothness=smoothness, function=function
     )
-    right_slice = smooth_square_well_atan(
-        params.pos[:, 2], right=0.025, left=0.005, depth=np.sin(theta), smoothness=smoothness
+    right_slice = smooth_square_well(
+        params.pos[:, 2], right=0.025, left=0.005, depth=np.sin(theta), smoothness=smoothness, function=function
     )
     target_xy = left_slice + right_slice
     target_z = torch.sqrt(1 - target_xy**2)
