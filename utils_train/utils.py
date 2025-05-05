@@ -183,12 +183,13 @@ class InfoScreen:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def print_info(self, epoch, L2_loss, lr):
+    def print_info(self, epoch, L2_loss, optimizer):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
         print(f"Loss: {L2_loss.item():.5f}")
-        print(f"learning rate: {lr:.6f}")
+        for i, param_group in enumerate(optimizer.param_groups):
+            print(f"Learning rate {i}: {param_group['lr']:.6f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
 
@@ -250,26 +251,12 @@ def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     if model.name == "MixedModel":
-        gradient_params = list(model.model3.parameters())
         pulse_params = list(model.model1.parameters()) + list(model.model2.parameters())
-        other_params = [
-            p
-            for n, p in model.named_parameters()
-            if n
-            not in [
-                *map(lambda x: x[0], model.model3.named_parameters()),
-                *map(lambda x: x[0], model.model1.named_parameters()),
-                *map(lambda x: x[0], model.model2.named_parameters()),
-            ]
-        ]
-        if not other_params.empty():
-            raise ValueError("Other parameters should be empty")
+        gradient_params = list(model.model3.parameters())
         optimizer = torch.optim.AdamW(
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    else:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr["pulse"], amsgrad=True)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
@@ -293,23 +280,23 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, metric="L2"):
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
-    pulse_height_loss = threshold_loss(pulse, 0.016)
+    pulse_height_loss = threshold_loss(pulse, 0.023)
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), 1)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_ddiff = torch.diff(phase_diff)
     phase_ddiff = phase_ddiff[tgt_xy[1:-1] > 1e-6]
     phase_diff_var = torch.var(phase_diff[tgt_xy[:-1] > 1e-6])
     phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
-    print("-" * 50)
-    print("LOSSES:")
-    print("loss_mxy", loss_mxy.item())
-    print("loss_mz", loss_mz.item())
-    print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
-    print("gradient_height_loss", gradient_height_loss.item() / 10)
-    print("pulse_height_loss", pulse_height_loss.item() * 100)
-    print("gradient_diff_loss", gradient_diff_loss.item())
-    print("phase_loss", phase_loss.item() * 10)
-    print("-" * 50)
+    # print("-" * 50)
+    # print("LOSSES:")
+    # print("loss_mxy", loss_mxy.item())
+    # print("loss_mz", loss_mz.item())
+    # print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
+    # print("gradient_height_loss", gradient_height_loss.item() / 10)
+    # print("pulse_height_loss", pulse_height_loss.item() * 100)
+    # print("gradient_diff_loss", gradient_diff_loss.item())
+    # print("phase_loss", phase_loss.item() * 10)
+    # print("-" * 50)
 
     return (
         loss_mxy,

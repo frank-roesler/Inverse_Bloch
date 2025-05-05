@@ -57,7 +57,6 @@ class MixedModel(PulseGradientBase):
         return super().to(device)
 
     def forward(self, x):
-
         out1 = self.model1(x)
         out2 = self.model2(x)
         out3 = self.model3(x)
