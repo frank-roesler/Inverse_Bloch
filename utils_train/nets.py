@@ -47,8 +47,8 @@ class MixedModel(PulseGradientBase):
         self.name = "MixedModel"
         self.model1 = FourierPulse(tmin, tmax, **kwargs)
         self.model2 = FourierPulse(tmin, tmax, **kwargs)
-        self.model3 = SIREN(**kwargs, output_dim=1)
-        # self.model3 = MLP(**kwargs, output_dim=1)
+        # self.model3 = SIREN(**kwargs, output_dim=1)
+        self.model3 = MLP(**kwargs, output_dim=1)
 
     def to(self, device):
         self.model1 = self.model1.to(device)

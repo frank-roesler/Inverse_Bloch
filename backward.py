@@ -13,7 +13,7 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=10000.0)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 3)
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7 / gam_hz_mt, 0.0, 1)
 # freq_offsets_Hz = [-297.3 * 4.7 / gam_hz_mt / 2]
 B0_freq_offsets_mT = freq_offsets_Hz
 B0_vals = []
