@@ -13,9 +13,9 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, funct
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7 / gam_hz_mt, 0.0, 1)
-# freq_offsets_Hz = [-297.3 * 4.7 / gam_hz_mt / 2]
-B0_freq_offsets_mT = freq_offsets_Hz
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
+# freq_offsets_Hz = torch.Tensor([-297.3 * 4.7 / 2])
+B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
 B0_vals = []
 for ff in range(len(freq_offsets_Hz)):
     B0_vals.append(B0 + B0_freq_offsets_mT[ff])
@@ -66,7 +66,7 @@ for epoch in range(epochs + 1):
     losses.append(loss.item())
     optimizer.zero_grad()
     loss.backward()
-    original_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10000.0)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10000.0)
     optimizer.step()
     scheduler.step(loss.item())
 
