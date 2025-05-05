@@ -20,9 +20,10 @@ def get_model(model_name, **kwargs):
 
 
 class PulseGradientBase(nn.Module):
-    def __init__(self, gradient_scale, tmin=None, tmax=None, output_dim=3, **kwargs):
+    def __init__(self, gradient_scale, positive_gradient=True, tmin=None, tmax=None, output_dim=3, **kwargs):
         super(PulseGradientBase, self).__init__()
         self.gradient_scale = gradient_scale
+        self.positive_gradient = positive_gradient
         self.tmin = tmin
         self.tmax = tmax
         self.output_dim = output_dim
@@ -31,6 +32,7 @@ class PulseGradientBase(nn.Module):
     def model_output_to_pulse_gradient(self, model_output, x):
         if self.output_dim != 3:
             return model_output
+        out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
         pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
         gradient = self.gradient_scale * model_output[:, 2:]
         if self.tmin is None or self.tmax is None:
@@ -40,10 +42,9 @@ class PulseGradientBase(nn.Module):
 
 
 class MixedModel(PulseGradientBase):
-    def __init__(self, tmin=None, tmax=None, positive_gradient=True, **kwargs):
+    def __init__(self, tmin=None, tmax=None, **kwargs):
         super(MixedModel, self).__init__(tmin=tmin, tmax=tmax, **kwargs)
         self.name = "MixedModel"
-        self.positive_gradient = positive_gradient
         self.model1 = FourierPulse(tmin, tmax, **kwargs)
         self.model2 = FourierPulse(tmin, tmax, **kwargs)
         self.model3 = SIREN(**kwargs, output_dim=1)
@@ -56,13 +57,12 @@ class MixedModel(PulseGradientBase):
         return super().to(device)
 
     def forward(self, x):
-        out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
+
         out1 = self.model1(x)
         out2 = self.model2(x)
-        out3 = self.gradient_scale * out_sign(self.model3(x))
-        pulse = out1 + 1j * out2
-        gradient = out3
-        return pulse, gradient
+        out3 = self.model3(x)
+        out = torch.cat([out1, out2, out3], dim=-1)
+        return self.model_output_to_pulse_gradient(out, x)
 
 
 class FourierPulse(nn.Module):
@@ -131,12 +131,16 @@ class SIREN(PulseGradientBase):
     ):
         super(SIREN, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.name = "SIREN"
-        self.omega_0 = omega_0
+        self.omega_0 = omega_0 / num_layers
         self.layers = nn.ModuleList()
-        self.layers.append(nn.Linear(input_dim, hidden_dim))
+        initial_weight_bound = 0.01
+        layer0 = nn.Linear(input_dim, hidden_dim)
+        self.layers.append(layer0)
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
+        init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=-initial_weight_bound, b=initial_weight_bound)
 
     def forward(self, x):
         x_orig = x.clone()

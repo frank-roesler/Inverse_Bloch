@@ -38,6 +38,7 @@ class TrainLogger:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         print(f"Training log saved to {filename}")
+        print("-" * 50)
 
     def export_json(self, directory="results"):
         modelname = self.log["model"].name
@@ -279,16 +280,16 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, metric="L2"):
     phase_ddiff = phase_ddiff[tgt_xy[1:-1] > 1e-6]
     phase_diff_var = torch.var(phase_diff[tgt_xy[:-1] > 1e-6])
     phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
-    # print("-" * 50)
-    # print("LOSSES:")
-    # print("loss_mxy", loss_mxy.item())
-    # print("loss_mz", loss_mz.item())
-    # print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
-    # print("gradient_height_loss", gradient_height_loss.item() / 10)
-    # print("pulse_height_loss", pulse_height_loss.item() * 100)
-    # print("gradient_diff_loss", gradient_diff_loss.item())
-    # print("phase_loss", phase_loss.item() * 10)
-    # print("-" * 50)
+    print("-" * 50)
+    print("LOSSES:")
+    print("loss_mxy", loss_mxy.item())
+    print("loss_mz", loss_mz.item())
+    print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
+    print("gradient_height_loss", gradient_height_loss.item() / 10)
+    print("pulse_height_loss", pulse_height_loss.item() * 100)
+    print("gradient_diff_loss", gradient_diff_loss.item())
+    print("phase_loss", phase_loss.item() * 10)
+    print("-" * 50)
 
     return (
         loss_mxy,
