@@ -112,7 +112,7 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
     from params import flip_angle
 
     npts = len(freq_offsets_Hz)
-    [mxy_profile, mz_profile] = blochsim_CK_freqprof2(
+    [mxy_profile, mz_profile] = blochsim_CK_freqprof(
         rf, grad, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt, freq_offsets_Hz=freq_offsets_Hz
     )
     mxy_profile = mxy_profile.detach().cpu().numpy() if isinstance(mxy_profile, torch.Tensor) else mxy_profile

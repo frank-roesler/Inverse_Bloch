@@ -9,4 +9,5 @@ results/*
 *.png
 *.pdf
 */*.pdf
-
+*.mp4
+.DS_Store
