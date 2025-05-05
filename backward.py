@@ -13,7 +13,7 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=5000.0)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 3)
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
 # freq_offsets_Hz = [-297.3 * 4.7 / gam_hz_mt / 2]
 B0_freq_offsets_mT = freq_offsets_Hz
 B0_vals = []
@@ -65,18 +65,13 @@ for epoch in range(epochs + 1):
 
     losses.append(loss.item())
     optimizer.zero_grad()
-
     loss.backward()
-    original_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float("inf"))
-    clipped_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
-    if clipped_grad_norm < original_grad_norm:
-        print(f"Original Gradient Norm: {original_grad_norm}")
-        print(f"Clipped Gradient Norm: {clipped_grad_norm}")
+    original_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10000.0)
     optimizer.step()
     scheduler.step(loss.item())
 
     # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[1, :], mxy[1, :], pulse, gradient)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient)
     infoscreen.print_info(epoch, loss, optimizer)
     trainLogger.log_epoch(
         epoch,
