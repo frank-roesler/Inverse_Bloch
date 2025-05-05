@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import torch
 import numpy as np
-from params import get_fixed_inputs, model_args
+from params import model_args
 import os
 import json
 
@@ -211,11 +211,12 @@ def move_to(tensor_list, device=torch.device("cpu")):
 
 
 def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")):
+    import params
+
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
     model, optimizer, scheduler, _ = init_training(model, lr=lr, device=device)
-    inputs, dt, Nz, sens, B0, tAx, fAx, t_B1 = get_fixed_inputs()
-    t_B1 = t_B1.to(device)
+    t_B1 = params.t_B1.to(device)
     loss = torch.inf
     epoch = 0
     while loss > thr:
@@ -279,10 +280,16 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
-def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
+def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, metric="L2"):
     xy_profile_abs = torch.abs(xy_profile)
-    L2_loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
-    L2_loss_mz = torch.mean((z_profile - tgt_z) ** 2)
+    if metric == "L2":
+        loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
+        loss_mz = torch.mean((z_profile - tgt_z) ** 2)
+    elif metric == "L1":
+        loss_mxy = torch.mean(torch.abs(xy_profile_abs - tgt_xy))
+        loss_mz = torch.mean(torch.abs(z_profile - tgt_z))
+    else:
+        raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
     boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
     gradient_height_loss = threshold_loss(gradient, 50)
     pulse_height_loss = threshold_loss(pulse, 0.016)
@@ -294,8 +301,8 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
     # print("-" * 50)
     # print("LOSSES:")
-    # print("L2_loss_mxy", L2_loss_mxy.item())
-    # print("L2_loss_mz", L2_loss_mz.item())
+    # print("loss_mxy", loss_mxy.item())
+    # print("loss_mz", loss_mz.item())
     # print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
     # print("gradient_height_loss", gradient_height_loss.item() / 10)
     # print("pulse_height_loss", pulse_height_loss.item() * 100)
@@ -304,8 +311,8 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient):
     # print("-" * 50)
 
     return (
-        L2_loss_mxy,
-        L2_loss_mz,
+        loss_mxy,
+        loss_mz,
         100 * boundary_vals_pulse,
         gradient_height_loss / 10,
         100 * pulse_height_loss,

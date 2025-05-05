@@ -7,8 +7,9 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy = get_targets(theta=flip_angle)
-# target_xy, target_ph, target_z = get_smooth_targets(smoothness=2)
+# target_z, target_xy = get_targets(theta=flip_angle)
+target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=5000.0)
+
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
@@ -43,8 +44,8 @@ for epoch in range(epochs + 1):
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
         (
-            L1_loss_mxy,
-            L1_loss_mz,
+            loss_mxy,
+            loss_mz,
             boundary_vals_pulse,
             gradient_height_loss,
             pulse_height_loss,
@@ -53,8 +54,8 @@ for epoch in range(epochs + 1):
             # ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
         ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
         loss += (
-            L1_loss_mxy
-            + L1_loss_mz
+            loss_mxy
+            + loss_mz
             + gradient_height_loss
             + gradient_diff_loss
             + pulse_height_loss
@@ -64,8 +65,13 @@ for epoch in range(epochs + 1):
 
     losses.append(loss.item())
     optimizer.zero_grad()
+
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2)
+    original_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=float("inf"))
+    clipped_grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.1)
+    if clipped_grad_norm < original_grad_norm:
+        print(f"Original Gradient Norm: {original_grad_norm}")
+        print(f"Clipped Gradient Norm: {clipped_grad_norm}")
     optimizer.step()
     scheduler.step(loss.item())
 

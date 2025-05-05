@@ -127,7 +127,7 @@ class MLP(PulseGradientBase):
 
 class SIREN(PulseGradientBase):
     def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=1, num_layers=3, omega_0=6, tmin=None, tmax=None, **kwargs
+        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, omega_0=6, tmin=None, tmax=None, **kwargs
     ):
         super(SIREN, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.name = "SIREN"
@@ -136,8 +136,7 @@ class SIREN(PulseGradientBase):
         self.layers.append(nn.Linear(input_dim, hidden_dim))
         for _ in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-        # self.final_layer = nn.Linear(hidden_dim, output_dim)
-        self.final_layer = nn.Sequential(nn.Linear(hidden_dim, output_dim), nn.Softplus())
+        self.final_layer = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
         x_orig = x.clone()
