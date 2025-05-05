@@ -12,8 +12,8 @@ target_z, target_xy = get_targets(theta=flip_angle)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-# freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
-freq_offsets_Hz = [-297.3 * 4.7 / gam_hz_mt / 2]
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
+# freq_offsets_Hz = [-297.3 * 4.7 / gam_hz_mt / 2]
 B0_freq_offsets_mT = freq_offsets_Hz
 B0_vals = []
 for ff in range(len(freq_offsets_Hz)):
@@ -37,8 +37,8 @@ trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offsets_Hz[0], M0=M0, dt=dt)
-    # mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
+    # mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offsets_Hz[0], M0=M0, dt=dt)
+    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
@@ -50,8 +50,8 @@ for epoch in range(epochs + 1):
             pulse_height_loss,
             gradient_diff_loss,
             phase_loss,
-        ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
+            # ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
+        ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
         loss += (
             L1_loss_mxy
             + L1_loss_mz
@@ -69,8 +69,8 @@ for epoch in range(epochs + 1):
     optimizer.step()
     scheduler.step(loss.item())
 
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[3, :], mxy[3, :], pulse, gradient)
+    # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[3, :], mxy[3, :], pulse, gradient)
     infoscreen.print_info(epoch, loss, optimizer.param_groups[0]["lr"])
     trainLogger.log_epoch(
         epoch,
