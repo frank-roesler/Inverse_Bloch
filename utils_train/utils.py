@@ -249,7 +249,27 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
 def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, amsgrad=True)
+    if model.name == "MixedModel":
+        gradient_params = list(model.model3.parameters())
+        pulse_params = list(model.model1.parameters()) + list(model.model2.parameters())
+        other_params = [
+            p
+            for n, p in model.named_parameters()
+            if n
+            not in [
+                *map(lambda x: x[0], model.model3.named_parameters()),
+                *map(lambda x: x[0], model.model1.named_parameters()),
+                *map(lambda x: x[0], model.model2.named_parameters()),
+            ]
+        ]
+        if not other_params.empty():
+            raise ValueError("Other parameters should be empty")
+        optimizer = torch.optim.AdamW(
+            [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
+            amsgrad=True,
+        )
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr["pulse"], amsgrad=True)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
@@ -312,9 +332,10 @@ def load_data(path):
     # optimizer = data_dict["optimizer"]
     # inputs = data_dict["inputs"]
     # targets = data_dict["targets"]
+    axes = data_dict["axes"]
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient
+    return pulse, gradient, axes
 
 
 def torch_unwrap(phase, discont=torch.pi):
