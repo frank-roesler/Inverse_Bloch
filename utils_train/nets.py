@@ -32,9 +32,12 @@ class PulseGradientBase(nn.Module):
     def model_output_to_pulse_gradient(self, model_output, x):
         if self.output_dim != 3:
             return model_output
-        out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
+        sigmoid = nn.Sigmoid()
         pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
-        gradient = self.gradient_scale * out_sign(model_output[:, 2:])
+        angle = torch.angle(pulse)
+        pulse_abs = 0.023 * sigmoid(torch.abs(pulse))
+        pulse = pulse_abs * torch.exp(1j * angle)
+        gradient = self.gradient_scale * sigmoid(model_output[:, 2:])
         if self.tmin is None or self.tmax is None:
             return pulse, gradient
         bdry_scaling = (x - self.tmin) * (self.tmax - x)

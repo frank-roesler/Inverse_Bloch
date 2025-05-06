@@ -26,7 +26,7 @@ model_args = {
     "center_spacing": 1,  # RBFN
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
-    "gradient_scale": 100.0,  # relative size of gradient to RF pulse
+    "gradient_scale": 200.0,  # relative size of gradient to RF pulse
     "positive_gradient": True,
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),
