@@ -36,6 +36,11 @@ if pre_train_inputs:
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
 trainLogger = TrainLogger(start_logging=start_logging)
 
+
+def f(x, threshold=1):
+    return 1 / (1 + x**2 / (threshold**2 + x))
+
+
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + B0_freq_offsets_mT[0], M0=M0, dt=dt)
@@ -75,12 +80,11 @@ for epoch in range(epochs + 1):
             total_grad_norm += param_norm.item() ** 2
     total_grad_norm = total_grad_norm**0.5
     print(f"Total Gradient Norm: {total_grad_norm}")
-    if total_grad_norm > 100:
-        factor = 1e-2 / total_grad_norm
-        for param in model.parameters():
-            if param.grad is not None:
-                param.grad.data.mul_(factor)
-        print(f"Gradient norm too high, scaling down by {factor}")
+    factor = f(total_grad_norm, 100)
+    for param in model.parameters():
+        if param.grad is not None:
+            param.grad.data.mul_(factor)
+    print(f"Gradient norm scaling down by {factor}")
 
     optimizer.step()
     scheduler.step(loss.item())
