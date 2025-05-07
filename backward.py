@@ -13,8 +13,8 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, funct
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
-# freq_offsets_Hz = torch.Tensor([-297.3 * 4.7 / 2])
+# freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
+freq_offsets_Hz = torch.Tensor([-297.3 * 4.7 / 2])
 B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
 B0_vals = []
 for ff in range(len(freq_offsets_Hz)):
@@ -38,8 +38,8 @@ trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    # mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + freq_offsets_Hz[0], M0=M0, dt=dt)
-    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
+    mxy, mz = blochsim_CK(B1=pulse, G=gradient, pos=pos, sens=sens, B0=B0 + B0_freq_offsets_mT[0], M0=M0, dt=dt)
+    # mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
@@ -51,8 +51,8 @@ for epoch in range(epochs + 1):
             pulse_height_loss,
             gradient_diff_loss,
             phase_loss,
-            # ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-        ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
+        ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
+        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
         loss += (
             loss_mxy
             + loss_mz
@@ -63,16 +63,31 @@ for epoch in range(epochs + 1):
             + phase_loss
         )
 
-    losses.append(loss.item())
+    lossItem = loss.item()
+    losses.append(lossItem)
     optimizer.zero_grad()
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10000.0)
+
+    total_grad_norm = 0.0
+    for param in model.parameters():
+        if param.grad is not None:
+            param_norm = param.grad.data.norm(2)
+            total_grad_norm += param_norm.item() ** 2
+    total_grad_norm = total_grad_norm**0.5
+    print(f"Total Gradient Norm: {total_grad_norm}")
+    if total_grad_norm > 100:
+        factor = 1e-2 / total_grad_norm
+        for param in model.parameters():
+            if param.grad is not None:
+                param.grad.data.mul_(factor)
+        print(f"Gradient norm too high, scaling down by {factor}")
+
     optimizer.step()
     scheduler.step(loss.item())
 
-    # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient)
-    infoscreen.print_info(epoch, loss, optimizer)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
+    # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient)
+    infoscreen.print_info(epoch, lossItem, optimizer)
     trainLogger.log_epoch(
         epoch,
         loss,

@@ -90,6 +90,7 @@ class InfoScreen:
         # Initialize plots for the first row
         self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
         self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
+        self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="|Pulse|", linestyle="dotted")[0]
         self.grad_plot = self.ax[1].plot([0], [1], linewidth=1, label="Gradient")[0]
         self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
 
@@ -133,6 +134,7 @@ class InfoScreen:
             tgt_xy = target_xy.detach().cpu().numpy()
             pulse_real = np.real(pulse.detach().cpu().numpy())
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
+            pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
             phasemin = np.min(phase)
@@ -148,9 +150,7 @@ class InfoScreen:
             self.ax_bottom_left.set_ylim(-0.1, 1.1)
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
-            self.ax[0].set_ylim(
-                (-np.max(np.sqrt(pulse_real**2 + pulse_imag**2)), np.max(np.sqrt(pulse_real**2 + pulse_imag**2)))
-            )
+            self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
             self.ax[1].set_ylim(
                 (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
@@ -164,6 +164,7 @@ class InfoScreen:
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
+            self.pulse_abs_plot.set_xdata(t)
             self.loss_plot.set_xdata(np.arange(epoch + 1))
 
             self.target_z_plot.set_ydata(tgt_z)
@@ -174,6 +175,7 @@ class InfoScreen:
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
             self.pulse_imag_plot.set_ydata(pulse_imag)
+            self.pulse_abs_plot.set_ydata(pulse_abs)
             self.loss_plot.set_ydata(losses)
 
             self.fig.canvas.draw()
@@ -183,11 +185,11 @@ class InfoScreen:
             plt.show(block=False)
             plt.pause(0.001)
 
-    def print_info(self, epoch, L2_loss, optimizer):
+    def print_info(self, epoch, loss, optimizer):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"Loss: {L2_loss.item():.5f}")
+        print(f"Loss: {loss:.5f}")
         for i, param_group in enumerate(optimizer.param_groups):
             print(f"Learning rate {i}: {param_group['lr']:.6f}")
         print(f"Time: {self.t1:.1f}")
@@ -250,6 +252,7 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
 def init_training(model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=lr["pulse"], amsgrad=True)
     if model.name == "MixedModel":
         pulse_params = list(model.model1.parameters()) + list(model.model2.parameters())
         gradient_params = list(model.model3.parameters())
