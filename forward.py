@@ -1,4 +1,4 @@
-from utils_bloch.setup import get_targets
+from utils_bloch.setup import get_smooth_targets
 from utils_train.utils import *
 import numpy as np
 from params import *
@@ -9,7 +9,7 @@ from time import time
 
 path = "results/train_log.pt"
 
-target_z, target_xy = get_targets(flip_angle)
+target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
 
 # B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
 # G = torch.from_numpy(inputs["Gs"]).to(torch.float32)

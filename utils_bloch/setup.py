@@ -76,17 +76,22 @@ def smooth_square_well(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0, func
     return well
 
 
-def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid):
+def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1):
     """higher smoothness values give sharper transitions"""
     import params
 
     smoothness *= 1000.0
-    left_slice = smooth_square_well(
-        params.pos[:, 2], left=-0.025, right=-0.005, depth=np.sin(theta), smoothness=smoothness, function=function
-    )
-    right_slice = smooth_square_well(
-        params.pos[:, 2], right=0.025, left=0.005, depth=np.sin(theta), smoothness=smoothness, function=function
-    )
-    target_xy = left_slice + right_slice
+
+    width = 0.02
+    distance = 0.01
+    left = -0.5 * (width * n_targets + distance * (n_targets - 1))
+
+    target_xy = torch.zeros(params.pos[:, 2].shape, dtype=torch.float32, requires_grad=False)
+    for i in range(n_targets):
+        target_xy += smooth_square_well(
+            params.pos[:, 2], left=left, right=left + width, depth=np.sin(theta), smoothness=smoothness, function=function
+        )
+        left += width + distance
+
     target_z = torch.sqrt(1 - target_xy**2)
     return target_z, target_xy
