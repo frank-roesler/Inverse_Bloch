@@ -9,6 +9,8 @@ import numpy as np
 # BLOCH PARAMETERS:
 def get_fixed_inputs(tfactor=1.0):
     Nz = 4096
+    gam = 267522.1199722082
+    gam_hz_mt = gam / (2 * np.pi)
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
     inputs["returnallstates"] = False
     inputs["dtmb"] *= tfactor
@@ -36,7 +38,13 @@ def get_fixed_inputs(tfactor=1.0):
     B0 = B0.contiguous()
     t_B1 = t_B1.contiguous()
     M0 = M0.contiguous()
-    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs)
+    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
+    B0_vals = []
+    for ff in range(len(freq_offsets_Hz)):
+        B0_vals.append(B0 + B0_freq_offsets_mT[ff])
+    B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
+    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs, freq_offsets_Hz, B0_list)
 
 
 def get_targets(theta=0.0):

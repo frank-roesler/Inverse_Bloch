@@ -13,7 +13,7 @@ loss_metric = "L2"
 # BLOCH PARAMETERS:
 n_slices = 4
 flip_angle = 17 / 45 * np.pi
-pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs(tfactor=2.0)
+pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -31,4 +31,12 @@ model_args = {
     "positive_gradient": False,
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),
+}
+
+# PARAMETERS OF THE SCANNER:
+# (will appear in as constraints in Loss function)
+scanner_params = {
+    "max_gradient": 50,  # mT/m
+    "max_diff_gradient": 200,  # mT/m/ms
+    "max_pulse_amplitude": 0.023,  # mT
 }
