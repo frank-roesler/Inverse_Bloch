@@ -14,7 +14,22 @@ class TrainLogger:
         self.start_logging = start_logging
         self.best_loss = np.inf
 
-    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, fixed_inputs, flip_angle, loss_metric, targets, axes):
+    def log_epoch(
+        self,
+        epoch,
+        L2_loss,
+        D_loss,
+        losses,
+        model,
+        optimizer,
+        pulse,
+        gradient,
+        fixed_inputs,
+        flip_angle,
+        loss_metric,
+        targets,
+        axes,
+    ):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
@@ -58,7 +73,10 @@ class TrainLogger:
                 "refocFract": None,
             },
             "conf": {"slthick": 0.02, "bs": 1.5, "tb": 4.8, "mb": 2},
-            "rfPls": {"real": torch.real(self.log["pulse"]).squeeze().tolist(), "imag": torch.imag(self.log["pulse"]).squeeze().tolist()},
+            "rfPls": {
+                "real": torch.real(self.log["pulse"]).squeeze().tolist(),
+                "imag": torch.imag(self.log["pulse"]).squeeze().tolist(),
+            },
         }
         with open(export_path, "w") as json_file:
             json.dump(data, json_file, indent=4)
@@ -117,7 +135,9 @@ class InfoScreen:
         # Combine legends from both axes
         lines_bottom_right, labels_bottom_right = self.ax_bottom_right.get_legend_handles_labels()
         lines_phase, labels_phase = self.ax_phase.get_legend_handles_labels()
-        self.ax_bottom_right.legend(lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right")
+        self.ax_bottom_right.legend(
+            lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right"
+        )
 
     def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
@@ -150,7 +170,9 @@ class InfoScreen:
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
-            self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
+            self.ax[1].set_ylim(
+                (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
+            )
 
             self.target_z_plot.set_xdata(fAx)
             self.target_xy_plot.set_xdata(fAx)
@@ -194,7 +216,11 @@ class InfoScreen:
 
 
 def get_device():
-    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = (
+        torch.device("cpu")
+        if torch.backends.mps.is_available()
+        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
     print("Device:", device)
     return device
 
@@ -249,7 +275,10 @@ def init_training(model, lr, device=torch.device("cpu")):
     if model.name == "MixedModel":
         pulse_params = list(model.model1.parameters()) + list(model.model2.parameters())
         gradient_params = list(model.model3.parameters())
-        optimizer = torch.optim.AdamW([{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}], amsgrad=True)
+        optimizer = torch.optim.AdamW(
+            [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
+            amsgrad=True,
+        )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
@@ -261,7 +290,7 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
-def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, metric="L2", **scanner_params):
+def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, scanner_params, metric="L2"):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
         loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
@@ -291,7 +320,15 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, metr
     # print("phase_loss", phase_loss.item() * 10)
     # print("-" * 50)
 
-    return (loss_mxy, loss_mz, 100 * boundary_vals_pulse, gradient_height_loss / 10, 100 * pulse_height_loss, gradient_diff_loss, 10 * phase_loss)
+    return (
+        loss_mxy,
+        loss_mz,
+        100 * boundary_vals_pulse,
+        gradient_height_loss / 10,
+        100 * pulse_height_loss,
+        gradient_diff_loss,
+        10 * phase_loss,
+    )
 
 
 def load_data(path):

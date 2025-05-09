@@ -38,4 +38,8 @@ model_args = {
 
 # PARAMETERS OF THE SCANNER:
 # (will appear in as constraints in Loss function)
-scanner_params = {"max_gradient": 50, "max_diff_gradient": 200, "max_pulse_amplitude": 0.023}  # mT/m  # mT/m/ms  # mT
+scanner_params = {
+    "max_gradient": 50,
+    "max_diff_gradient": 200,
+    "max_pulse_amplitude": 0.023,
+}  # mT/m  # mT/m/ms  # mT
