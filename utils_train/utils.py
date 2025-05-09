@@ -14,31 +14,49 @@ class TrainLogger:
         self.start_logging = start_logging
         self.best_loss = np.inf
 
-    def log_epoch(self, epoch, L2_loss, D_loss, losses, model, optimizer, pulse, gradient, inputs, targets, axes):
+    def log_epoch(
+        self,
+        epoch,
+        L2_loss,
+        D_loss,
+        losses,
+        model,
+        optimizer,
+        pulse,
+        gradient,
+        fixed_inputs,
+        flip_angle,
+        loss_metric,
+        targets,
+        axes,
+    ):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
         self.log["D_loss"] = D_loss.item()
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
-        self.log["inputs"] = inputs
+        self.log["inputs"] = fixed_inputs
         self.log["targets"] = targets
         self.log["pulse"] = pulse
         self.log["gradient"] = gradient
         self.log["axes"] = axes
-        self.save(epoch, losses)
-        self.export_json()
+        self.log["flip_angle"] = flip_angle
+        self.log["loss_metric"] = loss_metric
+        return self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
         if epoch <= self.start_logging:
-            return
+            return False
         if not losses[-1] < 0.999 * self.best_loss:
-            return
+            return False
         self.best_loss = losses[-1]
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
+        self.export_json()
         print(f"Training log saved to {filename}")
         print("-" * 50)
+        return True
 
     def export_json(self, directory="results"):
         modelname = self.log["model"].name
@@ -121,7 +139,7 @@ class InfoScreen:
             lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right"
         )
 
-    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient):
+    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
         if epoch % self.output_every == 0:
             fAx = fAx.cpu()[:, 2]
@@ -179,9 +197,10 @@ class InfoScreen:
             self.loss_plot.set_ydata(losses)
 
             self.fig.canvas.draw()
-            filename = "results/training.png"
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            plt.savefig(filename, dpi=300)
+            if export_figure:
+                filename = "results/training.png"
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                plt.savefig(filename, dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 

@@ -8,8 +8,7 @@ from params import *
 
 device = get_device()
 # target_z, target_xy = get_targets(theta=flip_angle)
-target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid)
-
+target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
 gam = 267522.1199722082
 gam_hz_mt = gam / (2 * np.pi)
@@ -21,9 +20,7 @@ for ff in range(len(freq_offsets_Hz)):
     B0_vals.append(B0 + B0_freq_offsets_mT[ff])
 B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
 
-B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to(
-    (B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device
-)
+B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
 model = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
@@ -34,11 +31,12 @@ if pre_train_inputs:
     model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr=1e-4, thr=1e-5, device=device)
 
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
+
 trainLogger = TrainLogger(start_logging=start_logging)
 
 
 def f(x, threshold=1):
-    return 1 / (1 + x**2 / (threshold**2 + x))
+    return 1 / (1 + 10 * x**2 / (threshold**2 + x))
 
 
 for epoch in range(epochs + 1):
@@ -48,25 +46,11 @@ for epoch in range(epochs + 1):
 
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
-        (
-            loss_mxy,
-            loss_mz,
-            boundary_vals_pulse,
-            gradient_height_loss,
-            pulse_height_loss,
-            gradient_diff_loss,
-            phase_loss,
-        ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
-        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
-        loss += (
-            loss_mxy
-            + loss_mz
-            + gradient_height_loss
-            + gradient_diff_loss
-            + pulse_height_loss
-            + boundary_vals_pulse
-            + phase_loss
+        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+            mz, mxy, target_z, target_xy, pulse, gradient
         )
+        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
+        loss += loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
     lossItem = loss.item()
     losses.append(lossItem)
@@ -87,12 +71,9 @@ for epoch in range(epochs + 1):
     print(f"Gradient norm scaling down by {factor}")
 
     optimizer.step()
-    scheduler.step(loss.item())
+    scheduler.step(lossItem)
 
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient)
-    # infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient)
-    infoscreen.print_info(epoch, lossItem, optimizer)
-    trainLogger.log_epoch(
+    new_optimum = trainLogger.log_epoch(
         epoch,
         loss,
         boundary_vals_pulse,
@@ -101,7 +82,14 @@ for epoch in range(epochs + 1):
         optimizer,
         pulse,
         gradient,
-        inputs,
+        (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs),
+        flip_angle,
+        loss_metric,
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
+    # infoscreen.plot_info(
+    #     epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient, new_optimum
+    # )
+    infoscreen.print_info(epoch, lossItem, optimizer)

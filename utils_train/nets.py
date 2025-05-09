@@ -43,12 +43,12 @@ class PulseGradientBase(nn.Module):
 
 class MixedModel(PulseGradientBase):
     def __init__(self, tmin=None, tmax=None, **kwargs):
-        super(MixedModel, self).__init__(tmin=tmin, tmax=tmax, **kwargs)
+        super(MixedModel, self).__init__(tmin=None, tmax=None, **kwargs)
         self.name = "MixedModel"
         self.model1 = FourierPulse(tmin, tmax, **kwargs)
         self.model2 = FourierPulse(tmin, tmax, **kwargs)
-        # self.model3 = SIREN(**kwargs, output_dim=1)
-        self.model3 = MLP(**kwargs, output_dim=1)
+        self.model3 = SIREN(**kwargs, output_dim=1)
+        # self.model3 = MLP(**kwargs, output_dim=1)
 
     def to(self, device):
         self.model1 = self.model1.to(device)
@@ -117,7 +117,7 @@ class MLP(PulseGradientBase):
         for layer in self.model:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight, gain=nn.init.calculate_gain("relu"))
-                nn.init.uniform_(layer.bias, -0.1, 0.1)
+                nn.init.uniform_(layer.bias, -0.001, 0.001)
 
     def forward(self, x):
         output = self.model(x)
@@ -125,14 +125,12 @@ class MLP(PulseGradientBase):
 
 
 class SIREN(PulseGradientBase):
-    def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, omega_0=6, tmin=None, tmax=None, **kwargs
-    ):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, omega_0=6, tmin=None, tmax=None, **kwargs):
         super(SIREN, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.name = "SIREN"
         self.omega_0 = omega_0 / num_layers
         self.layers = nn.ModuleList()
-        initial_weight_bound = 0.01
+        initial_weight_bound = 0.1
         layer0 = nn.Linear(input_dim, hidden_dim)
         self.layers.append(layer0)
         for _ in range(num_layers - 1):
@@ -164,16 +162,7 @@ class RBFN(PulseGradientBase):
 
 class FourierMLP(PulseGradientBase):
     def __init__(
-        self,
-        input_dim=1,
-        hidden_dim=64,
-        output_dim=3,
-        num_layers=3,
-        num_fourier_features=10,
-        frequency_scale=10,
-        tmin=None,
-        tmax=None,
-        **kwargs,
+        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
     ):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
