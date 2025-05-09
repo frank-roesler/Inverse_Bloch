@@ -120,7 +120,7 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
     pos = pos.detach().cpu().numpy() if isinstance(pos, torch.Tensor) else pos
 
     # Create figure and subplots
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4))
 
     # Subplot 1: abs(Mxy)
     im1 = axes[0].imshow(
@@ -171,7 +171,7 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
         ],
         aspect="auto",
         vmax=1,
-        vmin=np.sin(flip_angle),
+        vmin=np.cos(flip_angle),
     )
     axes[2].set_xlabel("Off Resonance [ppm]")
     axes[2].set_ylabel("Spatial Pos [cm]")

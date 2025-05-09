@@ -20,7 +20,10 @@ for ff in range(len(freq_offsets_Hz)):
     B0_vals.append(B0 + B0_freq_offsets_mT[ff])
 B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
 
-B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
+B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to(
+    (B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device
+)
+delta_t = torch.diff(t_B1, axis=0)
 
 model = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
@@ -46,11 +49,25 @@ for epoch in range(epochs + 1):
 
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
-        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
-            mz, mxy, target_z, target_xy, pulse, gradient
+        (
+            loss_mxy,
+            loss_mz,
+            boundary_vals_pulse,
+            gradient_height_loss,
+            pulse_height_loss,
+            gradient_diff_loss,
+            phase_loss,
+        ) = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient, delta_t, metric=loss_metric)
+        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient,delta_t,metric=loss_metric)
+        loss += (
+            loss_mxy
+            + loss_mz
+            + gradient_height_loss
+            + gradient_diff_loss
+            + pulse_height_loss
+            + boundary_vals_pulse
+            + phase_loss
         )
-        # ) = loss_fn(mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient)
-        loss += loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
     lossItem = loss.item()
     losses.append(lossItem)

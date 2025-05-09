@@ -7,7 +7,7 @@ from utils_bloch.blochsim_batch import blochsim_CK_batch
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from time import time
 
-path = "results/080525_Mixed_3Slices/train_log.pt"
+path = "/Users/frankrosler/Library/CloudStorage/Dropbox/090525_Mixed_4Slices/train_log.pt"
 
 target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
 
@@ -28,8 +28,8 @@ print("Device:", device)
 freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy = move_to(
     (freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy), device
 )
-with torch.no_grad():
-    plot_off_resonance(B1, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
+# with torch.no_grad():
+#     plot_off_resonance(B1, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
 
 
 freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 6)
@@ -50,7 +50,7 @@ G = G.cpu().numpy()
 B1 = B1.cpu().numpy()
 delta_t = np.diff(t_B1, axis=0)
 for ff in range(npts):
-    fig, ax = plt.subplots(2, 2, figsize=(12, 6))
+    fig, ax = plt.subplots(2, 2, figsize=(14, 6))
     ax[0, 0].plot(t_B1, np.real(B1), linewidth=0.8)
     ax[0, 0].plot(t_B1, np.imag(B1), linewidth=0.8)
     ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
