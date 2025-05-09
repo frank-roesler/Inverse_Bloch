@@ -7,7 +7,7 @@ import numpy as np
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs(tfactor=1.0):
+def get_fixed_inputs(tfactor=1.0, n_b0_values=1):
     Nz = 4096
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
@@ -38,7 +38,7 @@ def get_fixed_inputs(tfactor=1.0):
     B0 = B0.contiguous()
     t_B1 = t_B1.contiguous()
     M0 = M0.contiguous()
-    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 5)
+    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_b0_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_vals = []
     for ff in range(len(freq_offsets_Hz)):
@@ -97,7 +97,12 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     target_xy = torch.zeros(params.pos[:, 2].shape, dtype=torch.float32, requires_grad=False)
     for i in range(n_targets):
         target_xy += smooth_square_well(
-            params.pos[:, 2], left=left, right=left + width, depth=np.sin(theta), smoothness=smoothness, function=function
+            params.pos[:, 2],
+            left=left,
+            right=left + width,
+            depth=np.sin(theta),
+            smoothness=smoothness,
+            function=function,
         )
         left += width + distance
 
