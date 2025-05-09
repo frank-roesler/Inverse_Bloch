@@ -7,14 +7,16 @@ from utils_bloch.blochsim_batch import blochsim_CK_batch
 from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
 from time import time
 
-path = "results/train_log.pt"
+path = "results/080525_Mixed_3Slices/train_log.pt"
 
 target_z, target_xy = get_targets(flip_angle)
 
 # B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
 # G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-B1, G, axes = load_data(path)
+B1, G, axes, targets = load_data(path)
 t_B1 = axes["t_B1"]
+target_z = targets["target_z"]
+target_xy = targets["target_xy"]
 
 npts = 512
 gam = 267522.1199722082
@@ -30,8 +32,8 @@ with torch.no_grad():
     plot_off_resonance(B1, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
 
 
-freq_offsets_Hz = torch.linspace(-297.3 * 4.7 / gam_hz_mt, 0.0, 6)
-B0_freq_offsets_mT = freq_offsets_Hz
+freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 6)
+B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
 B0_list = []
 for ff in range(len(freq_offsets_Hz)):
     B0_list.append(B0 + B0_freq_offsets_mT[ff])
@@ -60,5 +62,14 @@ for ff in range(npts):
     ax[1, 0].plot(pos[:, 2], target_z, linewidth=0.8)
     ax[1, 1].plot(pos[:, 2], np.abs(mxy[ff, :]), linewidth=0.8)
     ax[1, 1].plot(pos[:, 2], target_xy, linewidth=0.8)
+
+    phase = np.unwrap(np.angle(mxy[ff, :]))
+    phasemin = np.min(phase)
+    phasemax = np.max(phase)
+    phase[target_xy < 0.5] = np.nan
+    ax_phase = ax[1, 1].twinx()
+    ax_phase.set_ylabel("Phase (radians)")
+    ax_phase.set_ylim(phasemin, phasemax)
+    ax_phase.plot(pos[:, 2], phase, linewidth=0.8, color="g")
     # plt.savefig("forward.png", dpi=300)
     plt.show()

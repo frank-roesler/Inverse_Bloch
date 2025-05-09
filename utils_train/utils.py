@@ -321,11 +321,11 @@ def load_data(path):
     # model = data_dict["model"]
     # optimizer = data_dict["optimizer"]
     # inputs = data_dict["inputs"]
-    # targets = data_dict["targets"]
+    targets = data_dict["targets"]
     axes = data_dict["axes"]
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient, axes
+    return pulse, gradient, axes, targets
 
 
 def torch_unwrap(phase, discont=torch.pi):

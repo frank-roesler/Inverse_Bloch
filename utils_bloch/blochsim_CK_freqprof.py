@@ -120,10 +120,10 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
     pos = pos.detach().cpu().numpy() if isinstance(pos, torch.Tensor) else pos
 
     # Create figure and subplots
-    fig, axes = plt.subplots(2, 3, figsize=(12, 6))
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
 
     # Subplot 1: abs(Mxy)
-    im1 = axes[0, 0].imshow(
+    im1 = axes[0].imshow(
         np.abs(mxy_profile),
         extent=[
             linspace(-8000, 8000, npts).min() / 297.3 + 4.7,
@@ -135,15 +135,15 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
         vmin=0,
         vmax=np.sin(flip_angle),
     )
-    axes[0, 0].set_xlabel("Off Resonance [ppm]")
-    axes[0, 0].set_ylabel("Spatial Pos [cm]")
-    axes[0, 0].axvline(4.7, color="r", linewidth=1.5)
-    axes[0, 0].set_title("abs(Mxy)")
-    axes[0, 0].invert_xaxis()
-    fig.colorbar(im1, ax=axes[0, 0])
+    axes[0].set_xlabel("Off Resonance [ppm]")
+    axes[0].set_ylabel("Spatial Pos [cm]")
+    axes[0].axvline(4.7, color="r", linewidth=1.5)
+    axes[0].set_title("abs(Mxy)")
+    axes[0].invert_xaxis()
+    fig.colorbar(im1, ax=axes[0])
 
     # Subplot 2: angle(Mxy)
-    im2 = axes[0, 1].imshow(
+    im2 = axes[1].imshow(
         unwrap(angle(mxy_profile), axis=0),
         extent=[
             linspace(-8000, 8000, npts).min() / 297.3 + 4.7,
@@ -153,15 +153,15 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
         ],
         aspect="auto",
     )
-    axes[0, 1].set_xlabel("Off Resonance [ppm]")
-    axes[0, 1].set_ylabel("Spatial Pos [cm]")
-    axes[0, 1].axvline(4.7, color="r", linewidth=1.5)
-    axes[0, 1].set_title("angle(Mxy)")
-    axes[0, 1].invert_xaxis()
-    fig.colorbar(im2, ax=axes[0, 1])
+    axes[1].set_xlabel("Off Resonance [ppm]")
+    axes[1].set_ylabel("Spatial Pos [cm]")
+    axes[1].axvline(4.7, color="r", linewidth=1.5)
+    axes[1].set_title("angle(Mxy)")
+    axes[1].invert_xaxis()
+    fig.colorbar(im2, ax=axes[1])
 
     # Subplot 3: abs(Mz)
-    im3 = axes[0, 2].imshow(
+    im3 = axes[2].imshow(
         np.abs(mz_profile),
         extent=[
             linspace(-8000, 8000, npts).min() / 297.3 + 4.7,
@@ -173,12 +173,12 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
         vmax=1,
         vmin=np.sin(flip_angle),
     )
-    axes[0, 2].set_xlabel("Off Resonance [ppm]")
-    axes[0, 2].set_ylabel("Spatial Pos [cm]")
-    axes[0, 2].axvline(4.7, color="r", linewidth=1.5)
-    axes[0, 2].set_title("Mz")
-    axes[0, 2].invert_xaxis()
-    fig.colorbar(im3, ax=axes[0, 2])
+    axes[2].set_xlabel("Off Resonance [ppm]")
+    axes[2].set_ylabel("Spatial Pos [cm]")
+    axes[2].axvline(4.7, color="r", linewidth=1.5)
+    axes[2].set_title("Mz")
+    axes[2].invert_xaxis()
+    fig.colorbar(im3, ax=axes[2])
 
     # Subplot 4: abs(Mxy) zoomed in
     extent_full = [
