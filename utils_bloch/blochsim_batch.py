@@ -30,15 +30,28 @@ def time_loop(
     -------
     Updated real and imaginary parts of state variables (Nb x Ns).
     """
-    for tt in range(reStatea.shape[-1]):
-        retmpa = reAlpha[:, :, tt] * reStatea[:, :, tt] - imAlpha[:, :, tt] * imStatea[:, :, tt] - (reBeta[:, :, tt] * reStateb[:, :, tt] + imBeta[:, :, tt] * imStateb[:, :, tt])
-        imtmpa = reAlpha[:, :, tt] * imStatea[:, :, tt] + imAlpha[:, :, tt] * reStatea[:, :, tt] - (reBeta[:, :, tt] * imStateb[:, :, tt] - imBeta[:, :, tt] * reStateb[:, :, tt])
-        retmpb = reBeta[:, :, tt] * reStatea[:, :, tt] - imBeta[:, :, tt] * imStatea[:, :, tt] + (reAlpha[:, :, tt] * reStateb[:, :, tt] + imAlpha[:, :, tt] * imStateb[:, :, tt])
-        imtmpb = reBeta[:, :, tt] * imStatea[:, :, tt] + imBeta[:, :, tt] * reStatea[:, :, tt] + (reAlpha[:, :, tt] * imStateb[:, :, tt] - imAlpha[:, :, tt] * reStateb[:, :, tt])
-        reStatea[:, :, tt] = retmpa
-        imStatea[:, :, tt] = imtmpa
-        reStateb[:, :, tt] = retmpb
-        imStateb[:, :, tt] = imtmpb
+    Nt = reStatea.shape[-1] - 1
+    for tt in range(Nt):
+        reStatea[:, :, tt + 1] = (
+            reAlpha[:, :, tt].clone() * reStatea[:, :, tt].clone()
+            - imAlpha[:, :, tt].clone() * imStatea[:, :, tt].clone()
+            - (reBeta[:, :, tt].clone() * reStateb[:, :, tt].clone() + imBeta[:, :, tt].clone() * imStateb[:, :, tt].clone())
+        )
+        imStatea[:, :, tt + 1] = (
+            reAlpha[:, :, tt].clone() * imStatea[:, :, tt].clone()
+            + imAlpha[:, :, tt].clone() * reStatea[:, :, tt].clone()
+            - (reBeta[:, :, tt].clone() * imStateb[:, :, tt].clone() - imBeta[:, :, tt].clone() * reStateb[:, :, tt].clone())
+        )
+        reStateb[:, :, tt + 1] = (
+            reBeta[:, :, tt].clone() * reStatea[:, :, tt].clone()
+            - imBeta[:, :, tt].clone() * imStatea[:, :, tt].clone()
+            + (reAlpha[:, :, tt].clone() * reStateb[:, :, tt].clone() + imAlpha[:, :, tt].clone() * imStateb[:, :, tt].clone())
+        )
+        imStateb[:, :, tt + 1] = (
+            reBeta[:, :, tt].clone() * imStatea[:, :, tt].clone()
+            + imBeta[:, :, tt].clone() * reStatea[:, :, tt].clone()
+            + (reAlpha[:, :, tt].clone() * imStateb[:, :, tt].clone() - imAlpha[:, :, tt].clone() * reStateb[:, :, tt].clone())
+        )
     return (reStatea, imStatea, reStateb, imStateb)
 
 
