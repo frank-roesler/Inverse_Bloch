@@ -34,7 +34,7 @@ class PulseGradientBase(nn.Module):
             return model_output
         out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
         pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
-        gradient = out_sign(self.gradient_scale * model_output[:, 2:])
+        gradient = self.gradient_scale * out_sign(model_output[:, 2:])
         if self.tmin is None or self.tmax is None:
             return pulse, gradient
         bdry_scaling = (x - self.tmin) * (self.tmax - x)

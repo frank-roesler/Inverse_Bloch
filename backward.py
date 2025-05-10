@@ -52,20 +52,8 @@ for epoch in range(epochs + 1):
     losses.append(lossItem)
     optimizer.zero_grad()
     loss.backward()
-
-    total_grad_norm = 0.0
-    for param in model.parameters():
-        if param.grad is not None:
-            param_norm = param.grad.data.norm(2)
-            total_grad_norm += param_norm.item() ** 2
-    total_grad_norm = total_grad_norm**0.5
-    print(f"Total Gradient Norm: {total_grad_norm}")
-    factor = regularization_factor(total_grad_norm, 1000)
-    for param in model.parameters():
-        if param.grad is not None:
-            param.grad.data.mul_(factor)
-    print(f"Gradient norm scaling down by {factor}")
-
+    if suppress_loss_peaks:
+        model = regularize_model_gradients(model)
     optimizer.step()
     scheduler.step(lossItem)
 

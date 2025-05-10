@@ -141,8 +141,8 @@ class InfoScreen:
         """plots info curves during training"""
         if epoch % self.output_every == 0:
             fAx = fAx.cpu()[:, 2]
-            fmin = -0.07  # torch.min(fAx).item()
-            fmax = 0.07  # torch.max(fAx).item()
+            fmin = -0.09  # torch.min(fAx).item()
+            fmax = 0.09  # torch.max(fAx).item()
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
@@ -357,3 +357,19 @@ def torch_unwrap(phase, discont=torch.pi):
 
 def regularization_factor(x, threshold=1):
     return 1 / (1 + 10 * x**2 / (threshold**2 + x))
+
+
+def regularize_model_gradients(model):
+    total_grad_norm = 0.0
+    for param in model.parameters():
+        if param.grad is not None:
+            param_norm = param.grad.data.norm(2)
+            total_grad_norm += param_norm.item() ** 2
+    total_grad_norm = total_grad_norm**0.5
+    print(f"Total Gradient Norm: {total_grad_norm}")
+    factor = regularization_factor(total_grad_norm, 200)
+    for param in model.parameters():
+        if param.grad is not None:
+            param.grad.data.mul_(factor)
+    print(f"Gradient norm scaling down by {factor}")
+    return model
