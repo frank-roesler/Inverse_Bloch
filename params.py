@@ -4,22 +4,23 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
+lr = {"pulse": 1e-4, "gradient": 2e-5}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
+suppress_loss_peaks = True
 loss_metric = "L2"
 
 # BLOCH PARAMETERS:
 n_slices = 4
-n_b0_values = 3
+n_b0_values = 1
 flip_angle = 17 / 45 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
 model_args = {
-    "n_coeffs": 20,  # Fourier Series
+    "n_coeffs": 30,  # Fourier Series
     "omega_0": 40,  # SIREN
     "bandwidth": 101,  # ModulatedFourier
     "hidden_dim": 32,  # MLP, SIREN, ModulatedFourier

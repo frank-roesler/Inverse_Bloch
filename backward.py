@@ -12,7 +12,9 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, funct
 B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
 model = get_model(modelname, **model_args)
+model_old = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
+
 
 if pre_train_inputs:
     B1, G, axes, targets = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
@@ -36,19 +38,13 @@ for epoch in range(epochs + 1):
     losses.append(lossItem)
     optimizer.zero_grad()
     loss.backward()
-
-    total_grad_norm = 0.0
-    for param in model.parameters():
-        if param.grad is not None:
-            param_norm = param.grad.data.norm(2)
-            total_grad_norm += param_norm.item() ** 2
-    total_grad_norm = total_grad_norm**0.5
-    print(f"Total Gradient Norm: {total_grad_norm}")
-    factor = regularization_factor(total_grad_norm, 1000)
-    for param in model.parameters():
-        if param.grad is not None:
-            param.grad.data.mul_(factor)
-    print(f"Gradient norm scaling down by {factor}")
+    if suppress_loss_peaks:
+        # model = regularize_model_gradients(model)
+        if epoch > 100 and losses[-1] > 2 * losses[-2]:
+            model.load_state_dict(model_old.state_dict())
+            print("EXPLOSION!!! MODEL RESETTED")
+        else:
+            model_old.load_state_dict(model.state_dict())
 
     optimizer.step()
     scheduler.step(lossItem)
