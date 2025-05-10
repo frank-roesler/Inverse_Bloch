@@ -143,6 +143,9 @@ class InfoScreen:
             phasemax = np.max(phase)
             phase[:, tgt_xy < 0.5] = np.nan
 
+            self.ax[1, 0].clear()
+            self.ax[1, 1].clear()
+            self.ax[1, 2].clear()
             self.target_z_plot.set_xdata(fAx)
             self.target_xy_plot.set_xdata(fAx)
             self.phase_plot.set_xdata(fAx)
@@ -155,14 +158,14 @@ class InfoScreen:
             self.target_z_plot.set_ydata(tgt_z)
             self.target_xy_plot.set_ydata(tgt_xy)
             line_list = [list(zip(fAx, mz_plot[b, :, -1])) for b in range(mz_plot.shape[0])]
-            line_collection = LineCollection(line_list)
+            line_collection = LineCollection(line_list, linewidths=0.8)
             self.ax[1, 0].add_collection(line_collection)
             line_list = [list(zip(fAx, mxy_abs[b, :, -1])) for b in range(mxy_abs.shape[0])]
-            line_collection = LineCollection(line_list)
+            line_collection = LineCollection(line_list, linewidths=0.8)
             self.ax[1, 1].add_collection(line_collection)
 
             line_list = [list(zip(fAx, phase[b, :])) for b in range(mxy_abs.shape[0])]
-            line_collection = LineCollection(line_list)
+            line_collection = LineCollection(line_list, linewidths=0.8)
             self.ax[1, 1].add_collection(line_collection)
 
             self.grad_plot.set_ydata(gradient_for_plot)
@@ -171,7 +174,7 @@ class InfoScreen:
             self.pulse_abs_plot.set_ydata(pulse_abs)
             self.loss_plot.set_ydata(losses)
             line_list = [list(zip(t.squeeze(), mxy_abs[0, c, :])) for c in slice_centers]
-            line_collection = LineCollection(line_list)
+            line_collection = LineCollection(line_list, linewidths=0.8)
             self.ax[1, 2].add_collection(line_collection)
 
             self.ax[1, 0].set_xlim(fmin, fmax)
