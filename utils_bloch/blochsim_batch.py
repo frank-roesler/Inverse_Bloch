@@ -115,8 +115,9 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     # Compute these out of loop
     normSquared = torch.abs(bxy) ** 2 + bz**2  # Nb x Ns x Nt
+    posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
-    Phi[normSquared > 0] = dt * gam * torch.sqrt(normSquared[normSquared > 0])
+    Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
     sinc_part = -1j * gam * dt * 0.5 * my_sinc(Phi / 2)
     alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
