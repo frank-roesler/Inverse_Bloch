@@ -27,24 +27,8 @@ for epoch in range(epochs + 1):
 
     loss = torch.tensor([0.0], device=device)
     for ff in range(len(freq_offsets_Hz)):
-        (
-            loss_mxy,
-            loss_mz,
-            boundary_vals_pulse,
-            gradient_height_loss,
-            pulse_height_loss,
-            gradient_diff_loss,
-            phase_loss,
-        ) = loss_fn(
-            mz[ff, :],
-            mxy[ff, :],
-            target_z,
-            target_xy,
-            pulse,
-            gradient,
-            1000 * dt,
-            scanner_params=scanner_params,
-            metric=loss_metric,
+        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+            mz[ff, :], mxy[ff, :], target_z, target_xy, pulse, gradient, 1000 * dt, scanner_params=scanner_params, metric=loss_metric
         )
         loss += loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
@@ -84,5 +68,17 @@ for epoch in range(epochs + 1):
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient, new_optimum)
+    infoscreen.plot_info(
+        epoch,
+        losses,
+        pos,
+        t_B1,
+        target_z,
+        target_xy,
+        mz[0, :],
+        mxy[0, :],
+        pulse,
+        gradient,
+        new_optimum,
+    )
     infoscreen.print_info(epoch, lossItem, optimizer)

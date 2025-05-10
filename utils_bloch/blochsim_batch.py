@@ -5,7 +5,6 @@ from utils_bloch.blochsim_CK import my_sinc
 
 @torch.jit.script
 def time_loop(
-    Nt: int,
     reAlpha: torch.Tensor,
     reBeta: torch.Tensor,
     imAlpha: torch.Tensor,
@@ -31,31 +30,15 @@ def time_loop(
     -------
     Updated real and imaginary parts of state variables (Nb x Ns).
     """
-    for tt in range(Nt):
-        retmpa = (
-            reAlpha[:, :, tt] * reStatea
-            - imAlpha[:, :, tt] * imStatea
-            - (reBeta[:, :, tt] * reStateb + imBeta[:, :, tt] * imStateb)
-        )
-        imtmpa = (
-            reAlpha[:, :, tt] * imStatea
-            + imAlpha[:, :, tt] * reStatea
-            - (reBeta[:, :, tt] * imStateb - imBeta[:, :, tt] * reStateb)
-        )
-        retmpb = (
-            reBeta[:, :, tt] * reStatea
-            - imBeta[:, :, tt] * imStatea
-            + (reAlpha[:, :, tt] * reStateb + imAlpha[:, :, tt] * imStateb)
-        )
-        imtmpb = (
-            reBeta[:, :, tt] * imStatea
-            + imBeta[:, :, tt] * reStatea
-            + (reAlpha[:, :, tt] * imStateb - imAlpha[:, :, tt] * reStateb)
-        )
-        reStatea = retmpa
-        imStatea = imtmpa
-        reStateb = retmpb
-        imStateb = imtmpb
+    for tt in range(reStatea.shape[-1]):
+        retmpa = reAlpha[:, :, tt] * reStatea[:, :, tt] - imAlpha[:, :, tt] * imStatea[:, :, tt] - (reBeta[:, :, tt] * reStateb[:, :, tt] + imBeta[:, :, tt] * imStateb[:, :, tt])
+        imtmpa = reAlpha[:, :, tt] * imStatea[:, :, tt] + imAlpha[:, :, tt] * reStatea[:, :, tt] - (reBeta[:, :, tt] * imStateb[:, :, tt] - imBeta[:, :, tt] * reStateb[:, :, tt])
+        retmpb = reBeta[:, :, tt] * reStatea[:, :, tt] - imBeta[:, :, tt] * imStatea[:, :, tt] + (reAlpha[:, :, tt] * reStateb[:, :, tt] + imAlpha[:, :, tt] * imStateb[:, :, tt])
+        imtmpb = reBeta[:, :, tt] * imStatea[:, :, tt] + imBeta[:, :, tt] * reStatea[:, :, tt] + (reAlpha[:, :, tt] * imStateb[:, :, tt] - imAlpha[:, :, tt] * reStateb[:, :, tt])
+        reStatea[:, :, tt] = retmpa
+        imStatea[:, :, tt] = imtmpa
+        reStateb[:, :, tt] = retmpb
+        imStateb[:, :, tt] = imtmpb
     return (reStatea, imStatea, reStateb, imStateb)
 
 
@@ -97,8 +80,8 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     Nb = B0_list.shape[0]  # Number of B0 values
 
     # Initialize state variables
-    statea = torch.ones((Nb, Ns), dtype=torch.complex64, device=B1.device, requires_grad=False)
-    stateb = torch.zeros((Nb, Ns), dtype=torch.complex64, device=B1.device, requires_grad=False)
+    statea = torch.ones((Nb, Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
+    stateb = torch.zeros((Nb, Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
 
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)  # Ns x Nt
@@ -124,7 +107,6 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop(
-        Nt,
         torch.real(alpha),
         torch.real(beta),
         torch.imag(alpha),
@@ -143,8 +125,8 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
         mz0 = M0[2]
 
         # Broadcast to match Ns
-        mxy0 = mxy0.expand(Nb, Ns)
-        mz0 = mz0.expand(Nb, Ns)
+        mxy0 = mxy0.expand(Nb, Ns, Nt)
+        mz0 = mz0.expand(Nb, Ns, Nt)
     else:
         if M0.shape[0] == 3:
             mxy0 = torch.complex(M0[0], M0[1])
