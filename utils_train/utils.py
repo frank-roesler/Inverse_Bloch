@@ -135,9 +135,7 @@ class InfoScreen:
         # Combine legends from both axes
         lines_bottom_right, labels_bottom_right = self.ax_bottom_right.get_legend_handles_labels()
         lines_phase, labels_phase = self.ax_phase.get_legend_handles_labels()
-        self.ax_bottom_right.legend(
-            lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right"
-        )
+        self.ax_bottom_right.legend(lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right")
 
     def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
@@ -170,9 +168,7 @@ class InfoScreen:
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
-            self.ax[1].set_ylim(
-                (-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item())
-            )
+            self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
             self.target_z_plot.set_xdata(fAx)
             self.target_xy_plot.set_xdata(fAx)
@@ -216,11 +212,7 @@ class InfoScreen:
 
 
 def get_device():
-    device = (
-        torch.device("cpu")
-        if torch.backends.mps.is_available()
-        else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    )
+    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Device:", device)
     return device
 
@@ -256,15 +248,15 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
         # scheduler.step(loss.item())
         if epoch % 1000 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
-    plt.figure()
-    plt.plot(torch.real(pulse).detach().cpu().numpy(), label="pulse real")
-    plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
-    plt.figure()
-    plt.plot(torch.imag(pulse).detach().cpu().numpy(), label="pulse imag")
-    plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
-    plt.figure()
-    plt.plot(gradient.detach().cpu().numpy(), label="gradient")
-    plt.show()
+    # plt.figure()
+    # plt.plot(torch.real(pulse).detach().cpu().numpy(), label="pulse real")
+    # plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
+    # plt.figure()
+    # plt.plot(torch.imag(pulse).detach().cpu().numpy(), label="pulse imag")
+    # plt.plot(torch.imag(target_pulse).detach().cpu().numpy(), label="target pulse imag")
+    # plt.figure()
+    # plt.plot(gradient.detach().cpu().numpy(), label="gradient")
+    # plt.show()
     return model
 
 
@@ -327,7 +319,7 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, scan
         gradient_height_loss / 10,
         100 * pulse_height_loss,
         gradient_diff_loss,
-        10 * phase_loss,
+        phase_loss,
     )
 
 

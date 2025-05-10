@@ -4,19 +4,17 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = {"pulse": 1e-4, "gradient": 5e-4}  # learning rate
-plot_loss_frequency = 1  # plot every n steps
+lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
+plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 loss_metric = "L2"
 
 # BLOCH PARAMETERS:
 n_slices = 4
-n_b0_values = 5
+n_b0_values = 3
 flip_angle = 17 / 45 * np.pi
-pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(
-    tfactor=2.0, n_b0_values=n_b0_values
-)
+pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -39,7 +37,7 @@ model_args = {
 # PARAMETERS OF THE SCANNER:
 # (will appear in as constraints in Loss function)
 scanner_params = {
-    "max_gradient": 50,
-    "max_diff_gradient": 200,
-    "max_pulse_amplitude": 0.023,
-}  # mT/m  # mT/m/ms  # mT
+    "max_gradient": 50,  # mT/m
+    "max_diff_gradient": 200,  # mT/m/ms
+    "max_pulse_amplitude": 0.023,  # mT
+}

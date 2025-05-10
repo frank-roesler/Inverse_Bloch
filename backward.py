@@ -9,17 +9,14 @@ from params import *
 device = get_device()
 target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
-B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to(
-    (B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device
-)
+B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
 model = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
 if pre_train_inputs:
-    B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64).detach().requires_grad_(False).to(device)
-    G = torch.from_numpy(inputs["Gs"]).to(torch.float32).detach().requires_grad_(False).to(device)
-    model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr=1e-4, thr=1e-5, device=device)
+    B1, G, axes, targets = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
+    model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr={"pulse": 1e-4, "gradient": 2e-4}, thr=1e-5, device=device)
 
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
 trainLogger = TrainLogger(start_logging=start_logging)
@@ -49,15 +46,7 @@ for epoch in range(epochs + 1):
             scanner_params=scanner_params,
             metric=loss_metric,
         )
-        loss += (
-            loss_mxy
-            + loss_mz
-            + gradient_height_loss
-            + gradient_diff_loss
-            + pulse_height_loss
-            + boundary_vals_pulse
-            + phase_loss
-        )
+        loss += loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
     lossItem = loss.item()
     losses.append(lossItem)
@@ -71,7 +60,7 @@ for epoch in range(epochs + 1):
             total_grad_norm += param_norm.item() ** 2
     total_grad_norm = total_grad_norm**0.5
     print(f"Total Gradient Norm: {total_grad_norm}")
-    factor = regularization_factor(total_grad_norm, 100)
+    factor = regularization_factor(total_grad_norm, 1000)
     for param in model.parameters():
         if param.grad is not None:
             param.grad.data.mul_(factor)
@@ -95,7 +84,5 @@ for epoch in range(epochs + 1):
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
-    infoscreen.plot_info(
-        epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient, new_optimum
-    )
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient, new_optimum)
     infoscreen.print_info(epoch, lossItem, optimizer)
