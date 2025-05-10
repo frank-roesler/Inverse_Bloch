@@ -319,7 +319,7 @@ def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, scan
         gradient_height_loss / 10,
         100 * pulse_height_loss,
         gradient_diff_loss,
-        phase_loss,
+        10 * phase_loss,
     )
 
 
