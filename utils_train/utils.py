@@ -1,6 +1,9 @@
 from time import time
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib.collections import LineCollection
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import torch
 import numpy as np
 from params import model_args
@@ -90,7 +93,7 @@ class InfoScreen:
         self.init_plots()
 
     def init_plots(self):
-        self.fig = plt.figure(figsize=(11, 6), constrained_layout=False)
+        self.fig = plt.figure(figsize=(13, 7), constrained_layout=False)
         spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
 
         # First row: 3 plots spanning the entire width
@@ -104,20 +107,18 @@ class InfoScreen:
         self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])
         self.ax_phase = self.ax_bottom_right.twinx()
         self.ax_phase.set_ylabel("Phase (radians)")
+        self.ax_bottom_right.set_ylabel("|M_xy|")
 
         # Initialize plots for the first row
-        self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse real")[0]
-        self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="Pulse imag")[0]
-        self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=1, label="|Pulse|", linestyle="dotted")[0]
-        self.grad_plot = self.ax[1].plot([0], [1], linewidth=1, label="Gradient")[0]
-        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=1, label="Loss")[0]
+        self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="Pulse real")[0]
+        self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="Pulse imag")[0]
+        self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="|Pulse|", linestyle="dotted")[0]
+        self.grad_plot = self.ax[1].plot([0], [1], linewidth=0.9, label="Gradient")[0]
+        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=0.9, label="Loss")[0]
 
         # Initialize plots for the second row
-        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="Target_z")[0]
-        self.mz_plot = self.ax_bottom_left.plot([0], [1], linewidth=1, label="M_z")[0]
-        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="Target_xy")[0]
-        self.mxy_plot = self.ax_bottom_right.plot([0], [1], linewidth=1, label="|M_xy|")[0]
-        self.phase_plot = self.ax_phase.plot([0], [1], linewidth=1, label="Phase", color="g")[0]
+        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.9, label="Target_z")[0]
+        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=0.9, label="Target_xy")[0]
 
         # Set titles and legends
         self.ax[0].set_title("Pulse")
@@ -128,21 +129,13 @@ class InfoScreen:
         self.ax[0].legend()
         self.ax[1].legend()
         self.ax[2].legend()
-        self.ax_bottom_left.legend()
-        # self.ax_bottom_right.legend()
-        # self.ax_phase.legend()
 
-        # Combine legends from both axes
-        lines_bottom_right, labels_bottom_right = self.ax_bottom_right.get_legend_handles_labels()
-        lines_phase, labels_phase = self.ax_phase.get_legend_handles_labels()
-        self.ax_bottom_right.legend(lines_bottom_right + lines_phase, labels_bottom_right + labels_phase, loc="upper right")
-
-    def plot_info(self, epoch, losses, fAx, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
+    def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
         if epoch % self.output_every == 0:
-            fAx = fAx.cpu()[:, 2]
-            fmin = -0.09  # torch.min(fAx).item()
-            fmax = 0.09  # torch.max(fAx).item()
+            pos = pos.cpu()[:, 2]
+            fmin = -0.09  # torch.min(pos).item()
+            fmax = 0.09  # torch.max(pos).item()
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
@@ -152,10 +145,36 @@ class InfoScreen:
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
             pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
-            phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()))
+            phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()), axis=-1)
             phasemin = np.min(phase)
             phasemax = np.max(phase)
-            phase[tgt_xy < 0.5] = np.nan
+            phase[:, tgt_xy < 0.5] = np.nan
+
+            for collection in self.ax_bottom_left.collections:
+                collection.remove()
+            for collection in self.ax_bottom_right.collections:
+                collection.remove()
+            for collection in self.ax_phase.collections:
+                collection.remove()
+
+            self.target_z_plot.set_xdata(pos)
+            self.target_xy_plot.set_xdata(pos)
+            self.grad_plot.set_xdata(t)
+            self.pulse_real_plot.set_xdata(t)
+            self.pulse_imag_plot.set_xdata(t)
+            self.pulse_abs_plot.set_xdata(t)
+            self.loss_plot.set_xdata(np.arange(epoch + 1))
+
+            self.add_line_collection(self.ax_bottom_left, pos, mz_plot)
+            self.add_line_collection(self.ax_bottom_right, pos, mxy_abs)
+            self.add_line_collection(self.ax_phase, pos, phase, linestyle="dotted")
+            self.target_z_plot.set_ydata(tgt_z)
+            self.target_xy_plot.set_ydata(tgt_xy)
+            self.grad_plot.set_ydata(gradient_for_plot)
+            self.pulse_real_plot.set_ydata(pulse_real)
+            self.pulse_imag_plot.set_ydata(pulse_imag)
+            self.pulse_abs_plot.set_ydata(pulse_abs)
+            self.loss_plot.set_ydata(losses)
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
             self.ax_bottom_right.set_xlim(fmin, fmax)
@@ -170,28 +189,6 @@ class InfoScreen:
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
-            self.target_z_plot.set_xdata(fAx)
-            self.target_xy_plot.set_xdata(fAx)
-            self.mz_plot.set_xdata(fAx)
-            self.mxy_plot.set_xdata(fAx)
-            self.phase_plot.set_xdata(fAx)
-            self.grad_plot.set_xdata(t)
-            self.pulse_real_plot.set_xdata(t)
-            self.pulse_imag_plot.set_xdata(t)
-            self.pulse_abs_plot.set_xdata(t)
-            self.loss_plot.set_xdata(np.arange(epoch + 1))
-
-            self.target_z_plot.set_ydata(tgt_z)
-            self.target_xy_plot.set_ydata(tgt_xy)
-            self.mz_plot.set_ydata(mz_plot)
-            self.mxy_plot.set_ydata(mxy_abs)
-            self.phase_plot.set_ydata(phase)
-            self.grad_plot.set_ydata(gradient_for_plot)
-            self.pulse_real_plot.set_ydata(pulse_real)
-            self.pulse_imag_plot.set_ydata(pulse_imag)
-            self.pulse_abs_plot.set_ydata(pulse_abs)
-            self.loss_plot.set_ydata(losses)
-
             self.fig.canvas.draw()
             if export_figure:
                 filename = "results/training.png"
@@ -199,6 +196,16 @@ class InfoScreen:
                 plt.savefig(filename, dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
+
+    def add_line_collection(self, ax, xdata, ydata, linestyle="solid"):
+        line_list = [list(zip(xdata, ydata[b, :])) for b in range(ydata.shape[0])]
+        self.add_line_collection_from_list(ax, line_list, linestyle)
+
+    def add_line_collection_from_list(self, ax, line_list, linestyle):
+        cmap = cm.get_cmap("inferno", len(line_list))
+        colors = [cmap(i) for i in range(len(line_list))]
+        line_collection = LineCollection(line_list, linewidths=0.8, colors=colors, linestyle=linestyle)
+        ax.add_collection(line_collection)
 
     def print_info(self, epoch, loss, optimizer):
         self.t1 = time() - self.t0

@@ -43,7 +43,6 @@ for epoch in range(epochs + 1):
             print("EXPLOSION!!! MODEL RESETTED")
         else:
             model_old.load_state_dict(model.state_dict())
-
     optimizer.step()
     scheduler.step(lossItem)
 
@@ -62,5 +61,5 @@ for epoch in range(epochs + 1):
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz[0, :], mxy[0, :], pulse, gradient, new_optimum)
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
     infoscreen.print_info(epoch, lossItem, optimizer)
