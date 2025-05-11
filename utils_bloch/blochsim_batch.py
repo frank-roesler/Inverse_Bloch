@@ -9,49 +9,20 @@ def time_loop(
     reBeta: torch.Tensor,
     imAlpha: torch.Tensor,
     imBeta: torch.Tensor,
-    reStatea: torch.Tensor,
-    imStatea: torch.Tensor,
-    reStateb: torch.Tensor,
-    imStateb: torch.Tensor,
+    Nb: int,
+    Ns: int,
+    Nt: int,
+    device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Time loop for Bloch simulation, vectorized over batch dimension (Nb).
-
-    Parameters
-    ----------
-    Nt : int
-        Number of time points.
-    reAlpha, reBeta, imAlpha, imBeta : torch.Tensor
-        Real and imaginary parts of Cayley-Klein parameters (Nb x Ns x Nt).
-    reStatea, imStatea, reStateb, imStateb : torch.Tensor
-        Real and imaginary parts of state variables (Nb x Ns).
-
-    Returns
-    -------
-    Updated real and imaginary parts of state variables (Nb x Ns).
-    """
-    Nt = reStatea.shape[-1] - 1
-    for tt in range(Nt):
-        reStatea[:, :, tt + 1] = (
-            reAlpha[:, :, tt].clone() * reStatea[:, :, tt].clone()
-            - imAlpha[:, :, tt].clone() * imStatea[:, :, tt].clone()
-            - (reBeta[:, :, tt].clone() * reStateb[:, :, tt].clone() + imBeta[:, :, tt].clone() * imStateb[:, :, tt].clone())
-        )
-        imStatea[:, :, tt + 1] = (
-            reAlpha[:, :, tt].clone() * imStatea[:, :, tt].clone()
-            + imAlpha[:, :, tt].clone() * reStatea[:, :, tt].clone()
-            - (reBeta[:, :, tt].clone() * imStateb[:, :, tt].clone() - imBeta[:, :, tt].clone() * reStateb[:, :, tt].clone())
-        )
-        reStateb[:, :, tt + 1] = (
-            reBeta[:, :, tt].clone() * reStatea[:, :, tt].clone()
-            - imBeta[:, :, tt].clone() * imStatea[:, :, tt].clone()
-            + (reAlpha[:, :, tt].clone() * reStateb[:, :, tt].clone() + imAlpha[:, :, tt].clone() * imStateb[:, :, tt].clone())
-        )
-        imStateb[:, :, tt + 1] = (
-            reBeta[:, :, tt].clone() * imStatea[:, :, tt].clone()
-            + imBeta[:, :, tt].clone() * reStatea[:, :, tt].clone()
-            + (reAlpha[:, :, tt].clone() * imStateb[:, :, tt].clone() - imAlpha[:, :, tt].clone() * reStateb[:, :, tt].clone())
-        )
+    reStatea = torch.ones((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    reStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    imStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    imStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    for tt in range(Nt - 1):
+        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea[:, :, tt] - imAlpha[:, :, tt] * imStatea[:, :, tt] - (reBeta[:, :, tt] * reStateb[:, :, tt] + imBeta[:, :, tt] * imStateb[:, :, tt])
+        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea[:, :, tt] + imAlpha[:, :, tt] * reStatea[:, :, tt] - (reBeta[:, :, tt] * imStateb[:, :, tt] - imBeta[:, :, tt] * reStateb[:, :, tt])
+        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea[:, :, tt] - imBeta[:, :, tt] * imStatea[:, :, tt] + (reAlpha[:, :, tt] * reStateb[:, :, tt] + imAlpha[:, :, tt] * imStateb[:, :, tt])
+        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea[:, :, tt] + imBeta[:, :, tt] * reStatea[:, :, tt] + (reAlpha[:, :, tt] * imStateb[:, :, tt] - imAlpha[:, :, tt] * reStateb[:, :, tt])
     return (reStatea, imStatea, reStateb, imStateb)
 
 
@@ -92,13 +63,8 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     Nt = G.shape[0]  # Number of time points
     Nb = B0_list.shape[0]  # Number of B0 values
 
-    # Initialize state variables
-    statea = torch.ones((Nb, Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
-    stateb = torch.zeros((Nb, Ns, Nt), dtype=torch.complex64, device=B1.device, requires_grad=False)
-
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)  # Ns x Nt
-
     # Sum up gradient over channels: bz = pos * G.T
     bz = torch.matmul(pos, G.T)  # Ns x Nt
 
@@ -124,10 +90,10 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
         torch.real(beta),
         torch.imag(alpha),
         torch.imag(beta),
-        torch.real(statea),
-        torch.imag(statea),
-        torch.real(stateb),
-        torch.imag(stateb),
+        Nt,
+        Ns,
+        Nb,
+        B1.device,
     )
     statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
     stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
