@@ -29,7 +29,16 @@ torch.autograd.set_detect_anomaly(True)
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz, mxy_t_integrated = blochsim_CK_batch(
-        B1=pulse, G=gradient, pos=pos, sens=sens, dx=dx, B0_list=B0_list, M0=M0, slice_centers=slice_centers, slice_half_width=slice_half_width, dt=dt
+        B1=pulse,
+        G=gradient,
+        pos=pos,
+        sens=sens,
+        dx=dx,
+        B0_list=B0_list,
+        M0=M0,
+        slice_centers=slice_centers,
+        slice_half_width=slice_half_width,
+        dt=dt,
     )
 
     (
@@ -50,6 +59,7 @@ for epoch in range(epochs + 1):
         gradient,
         mxy_t_integrated,
         1000 * dt,
+        t_B1=t_B1,
         scanner_params=scanner_params,
         loss_weights=loss_weights,
         metric=loss_metric,

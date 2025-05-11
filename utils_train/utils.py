@@ -300,7 +300,19 @@ def threshold_loss(x, threshold):
 
 
 def loss_fn(
-    z_profile, xy_profile, target_z, target_xy, pulse, gradient, mxy_t_integrated, delta_t, scanner_params, loss_weights, metric="L2", verbose=False
+    z_profile,
+    xy_profile,
+    target_z,
+    target_xy,
+    pulse,
+    gradient,
+    mxy_t_integrated,
+    delta_t,
+    t_B1,
+    scanner_params,
+    loss_weights,
+    metric="L2",
+    verbose=False,
 ):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
@@ -320,7 +332,7 @@ def loss_fn(
     phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
     phase_diff_var = torch.var(phase_diff[:, target_xy[:-1] > 1e-6])
     phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
-    mxy_t_integrals = mxy_t_integrated.sum(dim=-1)
+    mxy_t_integrals = torch.sum(t_B1.view(1, 1, 512) * mxy_t_integrated, dim=-1) * delta_t
     center_of_mass_loss = torch.var(mxy_t_integrals, dim=1).sum(dim=0)
 
     if verbose:
