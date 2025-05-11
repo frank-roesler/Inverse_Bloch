@@ -7,7 +7,7 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy, centers = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
+target_z, target_xy, slice_centers, slice_half_width = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
 B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
@@ -23,18 +23,28 @@ if pre_train_inputs:
 infoscreen = InfoScreen(output_every=plot_loss_frequency)
 trainLogger = TrainLogger(start_logging=start_logging)
 
-
+torch.autograd.set_detect_anomaly(True)
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
+    mxy, mz, mxy_t_integrated = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, slice_centers=slice_centers, slice_half_width=slice_half_width, dt=dt)
 
-    (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+    (
+        loss_mxy,
+        loss_mz,
+        boundary_vals_pulse,
+        gradient_height_loss,
+        pulse_height_loss,
+        gradient_diff_loss,
+        phase_loss,
+        center_of_mass_loss,
+    ) = loss_fn(
         mz,
         mxy,
         target_z,
         target_xy,
         pulse,
         gradient,
+        mxy_t_integrated,
         1000 * dt,
         scanner_params=scanner_params,
         loss_weights=loss_weights,
@@ -72,5 +82,18 @@ for epoch in range(epochs + 1):
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
-    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum, centers)
+    infoscreen.plot_info(
+        epoch,
+        losses,
+        pos,
+        t_B1,
+        target_z,
+        target_xy,
+        mz,
+        mxy,
+        mxy_t_integrated,
+        pulse,
+        gradient,
+        new_optimum,
+    )
     infoscreen.print_info(epoch, lossItem, optimizer)

@@ -14,19 +14,24 @@ def time_loop(
     Nt: int,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    reStatea = torch.ones((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    reStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
     reStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
     imStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
     imStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+    reStatea[:, :, 0] = 1.0
     for tt in range(Nt - 1):
-        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea[:, :, tt] - imAlpha[:, :, tt] * imStatea[:, :, tt] - (reBeta[:, :, tt] * reStateb[:, :, tt] + imBeta[:, :, tt] * imStateb[:, :, tt])
-        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea[:, :, tt] + imAlpha[:, :, tt] * reStatea[:, :, tt] - (reBeta[:, :, tt] * imStateb[:, :, tt] - imBeta[:, :, tt] * reStateb[:, :, tt])
-        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea[:, :, tt] - imBeta[:, :, tt] * imStatea[:, :, tt] + (reAlpha[:, :, tt] * reStateb[:, :, tt] + imAlpha[:, :, tt] * imStateb[:, :, tt])
-        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea[:, :, tt] + imBeta[:, :, tt] * reStatea[:, :, tt] + (reAlpha[:, :, tt] * imStateb[:, :, tt] - imAlpha[:, :, tt] * reStateb[:, :, tt])
+        reStatea_t = reStatea[:, :, tt].clone()
+        imStatea_t = imStatea[:, :, tt].clone()
+        reStateb_t = reStateb[:, :, tt].clone()
+        imStateb_t = imStateb[:, :, tt].clone()
+        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
+        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
+        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
+        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
     return (reStatea, imStatea, reStateb, imStateb)
 
 
-def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
+def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, slice_centers, slice_half_width, dt=6.4e-6):
     """
     Batch version of Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
 
@@ -73,10 +78,10 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     B0_list = B0_list.expand(-1, -1, bz.shape[2])  # Expand B0_list to shape (Nb, Ns, Nt)
 
     # Add in chunks to avoid excessive memory usage
-    bz += B0_list  # Final shape: (Nb, Ns, Nt)
+    bz = bz + B0_list  # Final shape: (Nb, Ns, Nt)
 
     # Compute these out of loop
-    normSquared = torch.abs(bxy) ** 2 + bz**2  # Nb x Ns x Nt
+    normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
     Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
@@ -90,9 +95,9 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
         torch.real(beta),
         torch.imag(alpha),
         torch.imag(beta),
-        Nt,
-        Ns,
         Nb,
+        Ns,
+        Nt,
         B1.device,
     )
     statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
@@ -116,6 +121,12 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     # Calculate final magnetization
     mxy_batch = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
-    mz_batch = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
+    mz_batch = mz0 * ((statea * stateaBar).real - (stateb * statebBar).real) - 2 * (mxy0 * stateaBar * statebBar).real
 
-    return mxy_batch, mz_batch.real
+    mxy_batch_integrated = []
+    for c in slice_centers:
+        mxy_batch_integrated.append(torch.sum(mxy_batch[:, c - slice_half_width : c + slice_half_width, :], dim=1, keepdim=True))
+
+    mxy_batch_integrated_cat = torch.cat(mxy_batch_integrated, dim=1)
+
+    return mxy_batch[:, :, -1], mz_batch.real[:, :, -1], mxy_batch_integrated_cat

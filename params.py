@@ -18,6 +18,7 @@ loss_weights = {
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
     "phase_loss": 10.0,
+    "center_of_mass_loss": 1e-6,
 }
 
 # BLOCH PARAMETERS:

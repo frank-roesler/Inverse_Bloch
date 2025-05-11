@@ -59,19 +59,6 @@ def get_targets(theta=0.0):
     return target_z, target_xy
 
 
-# def get_smooth_targets(smoothness=1):
-#     pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs = get_fixed_inputs()
-#     # G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-#     # B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-#     mz, mxy = get_targets(np.pi / 2)
-#     # mxy, mz = blochsim_CK(B1=B1, G=G, sens=sens, B0=B0, **inputs)
-#     targAbsMxy, targPhMxy, targMz = buildTarget(mxy, mz, fAx, dt, bwTB=0.1, sharpnessTB=smoothness, phSlopReduction=1)
-#     targAbsMxy = torch.from_numpy(targAbsMxy).to(torch.float32).requires_grad_(False)
-#     targPhMxy = torch.from_numpy(targPhMxy).to(torch.float32).requires_grad_(False)
-#     targMz = torch.from_numpy(targMz).to(torch.float32).requires_grad_(False)
-#     return targAbsMxy, targPhMxy, targMz
-
-
 def smooth_square_well(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0, function=torch.sigmoid):
     step_left = function(smoothness * (x - left))
     step_right = function(smoothness * (right - x))
@@ -96,6 +83,10 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     distance = 0.01
     left = -0.5 * (width * n_targets + distance * (n_targets - 1))
 
+    pos0 = np.argmin(np.abs(posAx)).item()
+    posAtWidth = np.argmin(np.abs(posAx - width / 2)).item()
+    half_width = posAtWidth - pos0
+
     target_xy = torch.zeros(posAx.shape, dtype=torch.float32, requires_grad=False)
     centers = []
     for i in range(n_targets):
@@ -111,4 +102,4 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
         left += width + distance
 
     target_z = torch.sqrt(1 - target_xy**2)
-    return target_z, target_xy, centers
+    return target_z, target_xy, centers, half_width
