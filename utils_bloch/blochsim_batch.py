@@ -24,14 +24,22 @@ def time_loop(
         imStatea_t = imStatea[:, :, tt].clone()
         reStateb_t = reStateb[:, :, tt].clone()
         imStateb_t = imStateb[:, :, tt].clone()
-        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
-        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
-        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
-        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
+        reStatea[:, :, tt + 1] = (
+            reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
+        )
+        imStatea[:, :, tt + 1] = (
+            reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
+        )
+        reStateb[:, :, tt + 1] = (
+            reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
+        )
+        imStateb[:, :, tt + 1] = (
+            reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
+        )
     return (reStatea, imStatea, reStateb, imStateb)
 
 
-def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, slice_centers, slice_half_width, dt=6.4e-6):
+def blochsim_CK_batch(B1, G, pos, sens, dx, B0_list, M0, slice_centers, slice_half_width, dt=6.4e-6):
     """
     Batch version of Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
 
@@ -125,8 +133,8 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, slice_centers, slice_half_w
 
     mxy_batch_integrated = []
     for c in slice_centers:
-        mxy_batch_integrated.append(torch.sum(mxy_batch[:, c - slice_half_width : c + slice_half_width, :], dim=1, keepdim=True))
+        mxy_batch_integrated.append(torch.mean(torch.abs(mxy_batch[:, c - slice_half_width : c + slice_half_width, :]), dim=1, keepdim=True))
 
-    mxy_batch_integrated_cat = torch.cat(mxy_batch_integrated, dim=1)
+    mxy_batch_integrated = torch.cat(mxy_batch_integrated, dim=1)
 
-    return mxy_batch[:, :, -1], mz_batch.real[:, :, -1], mxy_batch_integrated_cat
+    return mxy_batch[:, :, -1], mz_batch.real[:, :, -1], mxy_batch_integrated

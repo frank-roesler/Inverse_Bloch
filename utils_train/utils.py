@@ -113,7 +113,7 @@ class InfoScreen:
         self.ax[0, 2].set_title("Loss")
         self.ax[1, 0].set_title("M_z profile")
         self.ax[1, 1].set_title("M_xy profile")
-        self.ax[1, 2].set_title("M_xy(t)")
+        self.ax[1, 2].set_title("Slice mean of |M_xy(t)|")
         self.ax[0, 0].legend()
         self.ax[0, 1].legend()
         self.ax[0, 2].legend()
@@ -299,7 +299,9 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
-def loss_fn(z_profile, xy_profile, target_z, target_xy, pulse, gradient, mxy_t_integrated, delta_t, scanner_params, loss_weights, metric="L2", verbose=False):
+def loss_fn(
+    z_profile, xy_profile, target_z, target_xy, pulse, gradient, mxy_t_integrated, delta_t, scanner_params, loss_weights, metric="L2", verbose=False
+):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
         loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).sum(dim=0)
