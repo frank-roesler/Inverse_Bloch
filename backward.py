@@ -27,28 +27,10 @@ for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
-    loss = torch.tensor([0.0], device=device)
-    for ff in range(len(freq_offsets_Hz)):
-        (
-            loss_mxy,
-            loss_mz,
-            boundary_vals_pulse,
-            gradient_height_loss,
-            pulse_height_loss,
-            gradient_diff_loss,
-            phase_loss,
-        ) = loss_fn(
-            mz[ff, :],
-            mxy[ff, :],
-            target_z,
-            target_xy,
-            pulse,
-            gradient,
-            1000 * dt,
-            scanner_params=scanner_params,
-            metric=loss_metric,
-        )
-        loss += loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
+    (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+        mz, mxy, target_z, target_xy, pulse, gradient, 1000 * dt, scanner_params=scanner_params, loss_weights=loss_weights, metric=loss_metric, verbose=True
+    )
+    loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
     lossItem = loss.item()
     losses.append(lossItem)

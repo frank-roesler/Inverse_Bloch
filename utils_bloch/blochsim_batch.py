@@ -5,15 +5,13 @@ from utils_bloch.blochsim_CK import my_sinc
 
 @torch.jit.script
 def time_loop(
-    Nt: int,
     reAlpha: torch.Tensor,
     reBeta: torch.Tensor,
     imAlpha: torch.Tensor,
     imBeta: torch.Tensor,
-    reStatea: torch.Tensor,
-    imStatea: torch.Tensor,
-    reStateb: torch.Tensor,
-    imStateb: torch.Tensor,
+    Nb: int,
+    Ns: int,
+    device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Time loop for Bloch simulation, vectorized over batch dimension (Nb).
@@ -31,27 +29,15 @@ def time_loop(
     -------
     Updated real and imaginary parts of state variables (Nb x Ns).
     """
-    for tt in range(Nt):
-        retmpa = (
-            reAlpha[:, :, tt] * reStatea
-            - imAlpha[:, :, tt] * imStatea
-            - (reBeta[:, :, tt] * reStateb + imBeta[:, :, tt] * imStateb)
-        )
-        imtmpa = (
-            reAlpha[:, :, tt] * imStatea
-            + imAlpha[:, :, tt] * reStatea
-            - (reBeta[:, :, tt] * imStateb - imBeta[:, :, tt] * reStateb)
-        )
-        retmpb = (
-            reBeta[:, :, tt] * reStatea
-            - imBeta[:, :, tt] * imStatea
-            + (reAlpha[:, :, tt] * reStateb + imAlpha[:, :, tt] * imStateb)
-        )
-        imtmpb = (
-            reBeta[:, :, tt] * imStatea
-            + imBeta[:, :, tt] * reStatea
-            + (reAlpha[:, :, tt] * imStateb - imAlpha[:, :, tt] * reStateb)
-        )
+    reStatea = torch.ones((Nb, Ns), dtype=torch.float32, device=device)
+    reStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imStatea = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    for tt in range(reAlpha.shape[-1]):
+        retmpa = reAlpha[:, :, tt] * reStatea - imAlpha[:, :, tt] * imStatea - (reBeta[:, :, tt] * reStateb + imBeta[:, :, tt] * imStateb)
+        imtmpa = reAlpha[:, :, tt] * imStatea + imAlpha[:, :, tt] * reStatea - (reBeta[:, :, tt] * imStateb - imBeta[:, :, tt] * reStateb)
+        retmpb = reBeta[:, :, tt] * reStatea - imBeta[:, :, tt] * imStatea + (reAlpha[:, :, tt] * reStateb + imAlpha[:, :, tt] * imStateb)
+        imtmpb = reBeta[:, :, tt] * imStatea + imBeta[:, :, tt] * reStatea + (reAlpha[:, :, tt] * imStateb - imAlpha[:, :, tt] * reStateb)
         reStatea = retmpa
         imStatea = imtmpa
         reStateb = retmpb
@@ -96,13 +82,8 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     Nt = G.shape[0]  # Number of time points
     Nb = B0_list.shape[0]  # Number of B0 values
 
-    # Initialize state variables
-    statea = torch.ones((Nb, Ns), dtype=torch.complex64, device=B1.device, requires_grad=False)
-    stateb = torch.zeros((Nb, Ns), dtype=torch.complex64, device=B1.device, requires_grad=False)
-
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)  # Ns x Nt
-
     # Sum up gradient over channels: bz = pos * G.T
     bz = torch.matmul(pos, G.T)  # Ns x Nt
 
@@ -114,7 +95,7 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     bz += B0_list  # Final shape: (Nb, Ns, Nt)
 
     # Compute these out of loop
-    normSquared = torch.abs(bxy) ** 2 + bz**2  # Nb x Ns x Nt
+    normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
     Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
@@ -124,15 +105,13 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop(
-        Nt,
         torch.real(alpha),
         torch.real(beta),
         torch.imag(alpha),
         torch.imag(beta),
-        torch.real(statea),
-        torch.imag(statea),
-        torch.real(stateb),
-        torch.imag(stateb),
+        Nb,
+        Ns,
+        B1.device,
     )
     statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
     stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
@@ -155,6 +134,6 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     # Calculate final magnetization
     mxy_batch = 2 * mz0 * stateaBar * stateb + mxy0 * stateaBar**2 - torch.conj(mxy0) * stateb**2
-    mz_batch = mz0 * (statea * stateaBar - stateb * statebBar) - 2 * torch.real(mxy0 * stateaBar * statebBar)
+    mz_batch = mz0 * (statea * stateaBar).real - (stateb * statebBar).real - 2 * (mxy0 * stateaBar * statebBar).real
 
     return mxy_batch, mz_batch.real

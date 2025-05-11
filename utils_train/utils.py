@@ -282,44 +282,57 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
-def loss_fn(z_profile, xy_profile, tgt_z, tgt_xy, pulse, gradient, delta_t, scanner_params, metric="L2"):
+def loss_fn(
+    z_profile,
+    xy_profile,
+    target_z,
+    target_xy,
+    pulse,
+    gradient,
+    delta_t,
+    scanner_params,
+    loss_weights,
+    metric="L2",
+    verbose=False,
+):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
-        loss_mxy = torch.mean((xy_profile_abs - tgt_xy) ** 2)
-        loss_mz = torch.mean((z_profile - tgt_z) ** 2)
+        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).sum(dim=0)
+        loss_mz = torch.mean((z_profile - target_z) ** 2).sum(dim=0)
     elif metric == "L1":
-        loss_mxy = torch.mean(torch.abs(xy_profile_abs - tgt_xy))
-        loss_mz = torch.mean(torch.abs(z_profile - tgt_z))
+        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
+        loss_mz = torch.mean(torch.abs(z_profile - target_z)).sum(dim=0)
     else:
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
-    boundary_vals_pulse = torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2
-    gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"])
-    pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"])
-    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t)
+    boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).sum(dim=0)
+    gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).sum(dim=0)
+    pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).sum(dim=0)
+    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_ddiff = torch.diff(phase_diff)
-    phase_ddiff = phase_ddiff[tgt_xy[1:-1] > 1e-6]
-    phase_diff_var = torch.var(phase_diff[tgt_xy[:-1] > 1e-6])
-    phase_loss = torch.mean(phase_ddiff**2) + phase_diff_var
-    # print("-" * 50)
-    # print("LOSSES:")
-    # print("loss_mxy", loss_mxy.item())
-    # print("loss_mz", loss_mz.item())
-    # print("boundary_vals_pulse", boundary_vals_pulse.item() * 100)
-    # print("gradient_height_loss", gradient_height_loss.item() / 10)
-    # print("pulse_height_loss", pulse_height_loss.item() * 100)
-    # print("gradient_diff_loss", gradient_diff_loss.item())
-    # print("phase_loss", phase_loss.item() * 10)
-    # print("-" * 50)
+    phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
+    phase_diff_var = torch.var(phase_diff[:, target_xy[:-1] > 1e-6])
+    phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
 
+    if verbose:
+        print("-" * 50)
+        print("LOSSES:")
+        print("loss_mxy", loss_weights["loss_mxy"] * loss_mxy.item())
+        print("loss_mz", loss_weights["loss_mz"] * loss_mz.item())
+        print("boundary_vals_pulse", loss_weights["boundary_vals_pulse"] * boundary_vals_pulse.item())
+        print("gradient_height_loss", loss_weights["gradient_height_loss"] * gradient_height_loss.item())
+        print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
+        print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
+        print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
+        print("-" * 50)
     return (
-        loss_mxy,
-        loss_mz,
-        100 * boundary_vals_pulse,
-        gradient_height_loss / 10,
-        100 * pulse_height_loss,
-        gradient_diff_loss,
-        10 * phase_loss,
+        loss_weights["loss_mxy"] * loss_mxy,
+        loss_weights["loss_mz"] * loss_mz,
+        loss_weights["boundary_vals_pulse"] * boundary_vals_pulse,
+        loss_weights["gradient_height_loss"] * gradient_height_loss,
+        loss_weights["pulse_height_loss"] * pulse_height_loss,
+        loss_weights["gradient_diff_loss"] * gradient_diff_loss,
+        loss_weights["phase_loss"] * phase_loss,
     )
 
 
