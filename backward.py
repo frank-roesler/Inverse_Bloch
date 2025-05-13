@@ -48,7 +48,7 @@ for epoch in range(epochs + 1):
     loss.backward()
     if suppress_loss_peaks:
         # model = regularize_model_gradients(model)
-        if epoch > 100 and losses[-1] > 2 * losses[-2]:
+        if epoch > 100 and losses[-1] > 4 * trainLogger.best_loss:
             model.load_state_dict(model_old.state_dict())
             print("EXPLOSION!!! MODEL RESETTED")
         elif epoch % 10 == 0:

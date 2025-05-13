@@ -34,14 +34,17 @@ def time_loop(
     imStatea = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
     imStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
     for tt in range(reAlpha.shape[-1]):
-        retmpa = reAlpha[:, :, tt] * reStatea - imAlpha[:, :, tt] * imStatea - (reBeta[:, :, tt] * reStateb + imBeta[:, :, tt] * imStateb)
-        imtmpa = reAlpha[:, :, tt] * imStatea + imAlpha[:, :, tt] * reStatea - (reBeta[:, :, tt] * imStateb - imBeta[:, :, tt] * reStateb)
-        retmpb = reBeta[:, :, tt] * reStatea - imBeta[:, :, tt] * imStatea + (reAlpha[:, :, tt] * reStateb + imAlpha[:, :, tt] * imStateb)
-        imtmpb = reBeta[:, :, tt] * imStatea + imBeta[:, :, tt] * reStatea + (reAlpha[:, :, tt] * imStateb - imAlpha[:, :, tt] * reStateb)
+        reAlpha_t = reAlpha[:, :, tt]
+        imAlpha_t = imAlpha[:, :, tt]
+        reBeta_t = reBeta[:, :, tt]
+        imBeta_t = imBeta[:, :, tt]
+        retmpa = reAlpha_t * reStatea - imAlpha_t * imStatea - (reBeta_t * reStateb + imBeta_t * imStateb)
+        imtmpa = reAlpha_t * imStatea + imAlpha_t * reStatea - (reBeta_t * imStateb - imBeta_t * reStateb)
+        retmpb = reBeta_t * reStatea - imBeta_t * imStatea + (reAlpha_t * reStateb + imAlpha_t * imStateb)
+        imStateb = reBeta_t * imStatea + imBeta_t * reStatea + (reAlpha_t * imStateb - imAlpha_t * reStateb)
         reStatea = retmpa
         imStatea = imtmpa
         reStateb = retmpb
-        imStateb = imtmpb
     return (reStatea, imStatea, reStateb, imStateb)
 
 
