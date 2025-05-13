@@ -28,7 +28,17 @@ for epoch in range(epochs + 1):
     mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
     (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
-        mz, mxy, target_z, target_xy, pulse, gradient, 1000 * dt, scanner_params=scanner_params, loss_weights=loss_weights, metric=loss_metric, verbose=True
+        mz,
+        mxy,
+        target_z,
+        target_xy,
+        pulse,
+        gradient,
+        1000 * dt,
+        scanner_params=scanner_params,
+        loss_weights=loss_weights,
+        metric=loss_metric,
+        verbose=True,
     )
     loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
@@ -41,7 +51,7 @@ for epoch in range(epochs + 1):
         if epoch > 100 and losses[-1] > 2 * losses[-2]:
             model.load_state_dict(model_old.state_dict())
             print("EXPLOSION!!! MODEL RESETTED")
-        else:
+        elif epoch % 10 == 0:
             model_old.load_state_dict(model.state_dict())
     optimizer.step()
     scheduler.step(lossItem)

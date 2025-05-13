@@ -4,7 +4,7 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = {"pulse": 1e-4, "gradient": 2e-5}  # learning rate
+lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
@@ -21,7 +21,7 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 3
+n_slices = 4
 n_b0_values = 4
 flip_angle = 17 / 45 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
@@ -38,7 +38,7 @@ model_args = {
     "center_spacing": 1,  # RBFN
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
-    "gradient_scale": 100.0,  # relative size of gradient to RF pulse
+    "gradient_scale": 10.0,  # relative size of gradient to RF pulse
     "positive_gradient": False,
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),

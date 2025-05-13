@@ -110,15 +110,15 @@ class InfoScreen:
         self.ax_bottom_right.set_ylabel("|M_xy|")
 
         # Initialize plots for the first row
-        self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="Pulse real")[0]
-        self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="Pulse imag")[0]
-        self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=0.9, label="|Pulse|", linestyle="dotted")[0]
-        self.grad_plot = self.ax[1].plot([0], [1], linewidth=0.9, label="Gradient")[0]
-        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=0.9, label="Loss")[0]
+        self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="Pulse real")[0]
+        self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="Pulse imag")[0]
+        self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="|Pulse|", linestyle="dotted")[0]
+        self.grad_plot = self.ax[1].plot([0], [1], linewidth=0.8, label="Gradient")[0]
+        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=0.8, label="Loss")[0]
 
         # Initialize plots for the second row
-        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.9, label="Target_z")[0]
-        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=0.9, label="Target_xy")[0]
+        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.8, label="Target_z")[0]
+        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=0.8, label="Target_xy")[0]
 
         # Set titles and legends
         self.ax[0].set_title("Pulse")
@@ -202,9 +202,9 @@ class InfoScreen:
         self.add_line_collection_from_list(ax, line_list, linestyle)
 
     def add_line_collection_from_list(self, ax, line_list, linestyle):
-        cmap = cm.get_cmap("inferno", len(line_list))
+        cmap = cm.get_cmap("tab10", len(line_list))
         colors = [cmap(i) for i in range(len(line_list))]
-        line_collection = LineCollection(line_list, linewidths=0.8, colors=colors, linestyle=linestyle)
+        line_collection = LineCollection(line_list, linewidths=0.7, colors=colors, linestyle=linestyle)
         ax.add_collection(line_collection)
 
     def print_info(self, epoch, loss, optimizer):
