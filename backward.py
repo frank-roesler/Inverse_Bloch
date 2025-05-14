@@ -69,7 +69,10 @@ for epoch in range(epochs + 1):
         flip_angle,
         loss_metric,
         {"target_z": target_z, "target_xy": target_xy},
-        {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
+        {"tAx": tAx, "fAx": fAx, "t_B1": t_B1, "pos": pos},
+        model_args,
+        scanner_params,
+        loss_weights,
     )
     infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
     infoscreen.print_info(epoch, lossItem, optimizer)

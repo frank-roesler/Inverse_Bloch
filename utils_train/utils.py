@@ -32,6 +32,9 @@ class TrainLogger:
         loss_metric,
         targets,
         axes,
+        model_args,
+        scanner_params,
+        loss_weights,
     ):
         self.log["epoch"] = epoch
         self.log["L2_loss"] = L2_loss.item()
