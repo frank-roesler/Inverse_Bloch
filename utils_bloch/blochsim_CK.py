@@ -35,26 +35,10 @@ def time_loop(
     imStateb: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     for tt in range(Nt):
-        retmpa = (
-            reAlpha[:, tt] * reStatea
-            - imAlpha[:, tt] * imStatea
-            - (reBeta[:, tt] * reStateb + imBeta[:, tt] * imStateb)
-        )
-        imtmpa = (
-            reAlpha[:, tt] * imStatea
-            + imAlpha[:, tt] * reStatea
-            - (reBeta[:, tt] * imStateb - imBeta[:, tt] * reStateb)
-        )
-        retmpb = (
-            reBeta[:, tt] * reStatea
-            - imBeta[:, tt] * imStatea
-            + (reAlpha[:, tt] * reStateb + imAlpha[:, tt] * imStateb)
-        )
-        imtmpb = (
-            reBeta[:, tt] * imStatea
-            + imBeta[:, tt] * reStatea
-            + (reAlpha[:, tt] * imStateb - imAlpha[:, tt] * reStateb)
-        )
+        retmpa = reAlpha[:, tt] * reStatea - imAlpha[:, tt] * imStatea - (reBeta[:, tt] * reStateb + imBeta[:, tt] * imStateb)
+        imtmpa = reAlpha[:, tt] * imStatea + imAlpha[:, tt] * reStatea - (reBeta[:, tt] * imStateb - imBeta[:, tt] * reStateb)
+        retmpb = reBeta[:, tt] * reStatea - imBeta[:, tt] * imStatea + (reAlpha[:, tt] * reStateb + imAlpha[:, tt] * imStateb)
+        imtmpb = reBeta[:, tt] * imStatea + imBeta[:, tt] * reStatea + (reAlpha[:, tt] * imStateb - imAlpha[:, tt] * reStateb)
         # tmpa = alpha[:, tt] * statea - betaBar[:, tt] * stateb
         # stateb = beta[:, tt] * statea + alphaBar[:, tt] * stateb
         reStatea = retmpa

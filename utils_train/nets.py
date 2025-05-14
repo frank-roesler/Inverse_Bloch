@@ -71,7 +71,7 @@ class FourierPulse(nn.Module):
         super().__init__()
         self.tpulse = t_max - t_min
         p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
-        weights = torch.exp(-((torch.arange(-n_coeffs, n_coeffs + 1)) ** 2))
+        weights = torch.exp(-0.1 * torch.arange(-n_coeffs, n_coeffs + 1) ** 2)
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
         self.k = torch.arange(-n_coeffs, n_coeffs + 1, requires_grad=False).unsqueeze(0)
@@ -161,9 +161,7 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
-    ):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]
