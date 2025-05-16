@@ -1,6 +1,6 @@
 from utils_train.nets import get_model
 from utils_train.utils import *
-from utils_bloch.blochsim_CK import blochsim_CK
+from utils_bloch.simulation_utils import blochsim_CK
 from utils_bloch.blochsim_batch import blochsim_CK_batch
 from utils_bloch.setup import get_targets, get_smooth_targets
 from params import *

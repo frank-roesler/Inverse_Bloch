@@ -44,7 +44,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1):
     for ff in range(len(freq_offsets_Hz)):
         B0_vals.append(B0 + B0_freq_offsets_mT[ff])
     B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
-    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs, freq_offsets_Hz, B0_list)
+    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs, freq_offsets_Hz, B0_list, gam, gam_hz_mt)
 
 
 def get_targets(theta=0.0):
