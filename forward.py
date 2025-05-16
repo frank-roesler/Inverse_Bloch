@@ -4,7 +4,7 @@ from utils_train.utils import *
 from params import *
 from utils_infer.plot_off_resonance import *
 
-path = "results/130525_Mixed_smooth_4Slices/train_log.pt"
+path = "results/160525_Mixed_smooth_1Slice/train_log.pt"
 
 # target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
 # B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
@@ -14,8 +14,6 @@ path = "results/130525_Mixed_smooth_4Slices/train_log.pt"
 
 npts_off_resonance = 128
 npts__some_b0_values = 1
-
-B1 = -np.conj(B1)
 
 device = get_device()
 freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
