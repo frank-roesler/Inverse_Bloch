@@ -1,4 +1,4 @@
-from blochsim_freqprof import *
+from utils_bloch.blochsim_freqprof import *
 import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
 from utils_train.utils import torch_unwrap, move_to
@@ -9,6 +9,8 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
 
     npts = len(freq_offsets_Hz)
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(rf, grad, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt, freq_offsets_Hz=freq_offsets_Hz)
+
+    (mxy_profile, mz_profile, pos) = move_to((mxy_profile, mz_profile, pos), torch.device("cpu"))
 
     fig, axes = plt.subplots(1, 3, figsize=(14.5, 4))
     img_extent = [
@@ -83,7 +85,7 @@ def plot_some_b0_values(n_values, pos, sens, G, B1, B0, M0, target_xy, target_z,
         ax[0, 0].plot(t_B1, np.real(B1), linewidth=0.8)
         ax[0, 0].plot(t_B1, np.imag(B1), linewidth=0.8)
         ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
-        ax[0, 1].plot(t_B1, G, linewidth=0.8)
+        ax[0, 1].plot(t_B1, G * np.ones(t_B1.shape), linewidth=0.8)
         ax01 = ax[0, 1].twinx()
         ax01.plot([], [])
         ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1)

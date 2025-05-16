@@ -15,8 +15,6 @@ if suppress_loss_peaks:
     model_old = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
-B0_list *= 0
-
 if pre_train_inputs:
     B1, G, axes, targets = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
     model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr={"pulse": 1e-4, "gradient": 2e-4}, thr=1e-5, device=device)
@@ -50,13 +48,17 @@ for epoch in range(epochs + 1):
     loss.backward()
     if suppress_loss_peaks:
         # model = regularize_model_gradients(model)
-        if epoch > 100 and losses[-1] > 4 * trainLogger.best_loss:
+        if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
             model.load_state_dict(model_old.state_dict())
             print("EXPLOSION!!! MODEL RESETTED")
-        elif epoch % 10 == 0:
-            model_old.load_state_dict(model.state_dict())
-    optimizer.step()
-    scheduler.step(lossItem)
+        else:
+            if epoch % 10 == 0:
+                model_old.load_state_dict(model.state_dict())
+            optimizer.step()
+            scheduler.step(lossItem)
+    else:
+        optimizer.step()
+        scheduler.step(lossItem)
 
     new_optimum = trainLogger.log_epoch(
         epoch,
