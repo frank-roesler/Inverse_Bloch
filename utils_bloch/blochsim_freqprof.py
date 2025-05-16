@@ -35,6 +35,7 @@ def blochsim_CK_freqprof(B1, G, pos, sens, B0, M0=np.array([0, 0, 1]), dt=6.4e-6
         B0_total_this_freq = B0_base + B0_freq_offsets_mT[ff]
         bz = bz_grad_component + torch.tile(B0_total_this_freq, (Nt, 1)).T
         alpha, beta = compute_alpha_beta(bxy, bz, dt, gamma, B1)
+        beta = beta.squeeze()
         statea, stateb = time_loop_complex(alpha.unsqueeze(0), beta.unsqueeze(0), 1, Ns, B1.device)
         statea, stateb = statea.squeeze(), stateb.squeeze()
         stateaBar, statebBar = torch.conj(statea), torch.conj(stateb)

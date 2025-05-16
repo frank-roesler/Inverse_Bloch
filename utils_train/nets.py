@@ -13,6 +13,7 @@ def get_model(model_name, **kwargs):
         "FourierMLP": FourierMLP,
         "MixedModel": MixedModel,
         "ModulatedFourier": ModulatedFourier,
+        "MixedModel_RealPulse": MixedModel_RealPulse,
     }
     if model_name not in model_dict:
         raise ValueError(f"Model {model_name} is not supported.")
@@ -199,3 +200,22 @@ class ModulatedFourier(PulseGradientBase):
     def forward(self, x):
         out = self.layers1(x)
         return self.model_output_to_pulse_gradient(out, x)
+
+
+class MixedModel_RealPulse(PulseGradientBase):
+    def __init__(self, tmin=None, tmax=None, **kwargs):
+        super(MixedModel_RealPulse, self).__init__(tmin=None, tmax=None, **kwargs)
+        self.name = "MixeMdodel_RealPulse"
+        self.pulse_model = FourierPulse(tmin, tmax, **kwargs)
+        self.gradient_value = torch.nn.Parameter(torch.randn(1))
+
+    def to(self, device):
+        self.pulse_model = self.pulse_model.to(device)
+        self.gradient_value = self.gradient_value.to(device)
+        return super().to(device)
+
+    def forward(self, x):
+        pulse = self.pulse_model(x)
+        gradient = self.gradient_scale * self.gradient_value
+
+        return pulse, gradient

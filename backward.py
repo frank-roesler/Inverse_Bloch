@@ -1,8 +1,7 @@
 from utils_train.nets import get_model
 from utils_train.utils import *
-from utils_bloch.simulation_utils import blochsim_CK
-from utils_bloch.blochsim_batch import blochsim_CK_batch
-from utils_bloch.setup import get_targets, get_smooth_targets
+from utils_bloch import blochsim_CK_batch, blochsim_CK_batch_realPulse
+from utils_bloch.setup import get_smooth_targets
 from params import *
 
 
@@ -12,9 +11,11 @@ target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, funct
 B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
 model = get_model(modelname, **model_args)
-model_old = get_model(modelname, **model_args)
+if suppress_loss_peaks:
+    model_old = get_model(modelname, **model_args)
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 
+B0_list *= 0
 
 if pre_train_inputs:
     B1, G, axes, targets = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
@@ -25,7 +26,8 @@ trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
-    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
+
+    mxy, mz = blochsim_CK_batch_realPulse(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
     (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
         mz,

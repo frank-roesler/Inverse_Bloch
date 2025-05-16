@@ -46,19 +46,19 @@ def cos_of_root(small_x):
     return 1 - small_x / 2 + small_x**2 / 24 - small_x**3 / 720 + small_x**4 / 40320
 
 
-def compute_alpha_beta(bxy, bz, dt, gam, B1):
+def compute_alpha_beta(bxy, bz, dt, gam):
     normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
-    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
+    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=bxy.device, requires_grad=False)
     Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
     sinc_part = -1j * gam * dt * 0.5 * torch.sinc(Phi / 2 / torch.pi)
     alpha = torch.cos(Phi / 2) - bz * sinc_part
     beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
-    return alpha, beta.squeeze()
+    return alpha, beta
 
 
-def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam, B1):
-    Phi_half_squared = (0.5 * dt * gam) ** 2 * (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
+def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam):
+    Phi_half_squared = (0.5 * dt * gam) ** 2 * ((bxy * torch.conj(bxy)).real + bz**2)  # Nb x Ns x Nt
     sinc_part = -1j * gam * dt * 0.5 * sinc_of_root(Phi_half_squared)
     alpha = cos_of_root(Phi_half_squared) - bz * sinc_part
     beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
@@ -128,6 +128,33 @@ def time_loop_real(
         imtmpa = reAlpha_t * imStatea + imAlpha_t * reStatea - (reBeta_t * imStateb - imBeta_t * reStateb)
         retmpb = reBeta_t * reStatea - imBeta_t * imStatea + (reAlpha_t * reStateb + imAlpha_t * imStateb)
         imStateb = reBeta_t * imStatea + imBeta_t * reStatea + (reAlpha_t * imStateb - imAlpha_t * reStateb)
+        reStatea = retmpa
+        imStatea = imtmpa
+        reStateb = retmpb
+    return (reStatea, imStatea, reStateb, imStateb)
+
+
+@torch.jit.script
+def time_loop_realPulse(
+    reAlpha: torch.Tensor,
+    imAlpha: torch.Tensor,
+    imBeta: torch.Tensor,
+    Nb: int,
+    Ns: int,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    reStatea = torch.ones((Nb, Ns), dtype=torch.float32, device=device)
+    reStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imStatea = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    for tt in range(reAlpha.shape[-1]):
+        reAlpha_t = reAlpha[:, :, tt]
+        imAlpha_t = imAlpha[:, :, tt]
+        imBeta_t = imBeta[:, :, tt]
+        retmpa = reAlpha_t * reStatea - imAlpha_t * imStatea - imBeta_t * imStateb
+        imtmpa = reAlpha_t * imStatea + imAlpha_t * reStatea + imBeta_t * reStateb
+        retmpb = -imBeta_t * imStatea + (reAlpha_t * reStateb + imAlpha_t * imStateb)
+        imStateb = imBeta_t * reStatea + (reAlpha_t * imStateb - imAlpha_t * reStateb)
         reStatea = retmpa
         imStatea = imtmpa
         reStateb = retmpb

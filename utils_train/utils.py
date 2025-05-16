@@ -81,7 +81,7 @@ class TrainLogger:
             "conf": {"slthick": 0.02, "bs": 1.5, "tb": 4.8, "mb": 2},
             "rfPls": {
                 "real": torch.real(self.log["pulse"]).squeeze().tolist(),
-                "imag": torch.imag(self.log["pulse"]).squeeze().tolist(),
+                "imag": torch.imag(self.log["pulse"]).squeeze().tolist() if self.log["pulse"].dtype == torch.complex64 else 0.0,
             },
         }
         with open(export_path, "w") as json_file:
@@ -281,6 +281,13 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
+    elif model.name == "MixeMdodel_RealPulse":
+        pulse_params = list(model.pulse_model.parameters())
+        gradient_params = [model.gradient_value]
+        optimizer = torch.optim.AdamW(
+            [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
+            amsgrad=True,
+        )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
@@ -317,7 +324,10 @@ def loss_fn(
     boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).sum(dim=0)
     gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).sum(dim=0)
     pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).sum(dim=0)
-    gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
+    if gradient.shape[0] > 1:
+        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
+    else:
+        gradient_diff_loss = torch.Tensor([0.0])
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_ddiff = torch.diff(phase_diff)
     phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]

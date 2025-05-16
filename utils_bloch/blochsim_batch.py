@@ -33,7 +33,7 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
     """
     gam, Nb, Ns, Nt, bxy, bz = setup_simulation(G, pos, sens, B0_list, B1)
 
-    alpha, beta = compute_alpha_beta(bxy, bz, dt, gam, B1)
+    alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop_real(

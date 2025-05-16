@@ -1,4 +1,4 @@
-from utils_bloch.blochsim_CK_freqprof import *
+from blochsim_freqprof import *
 import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
 from utils_train.utils import torch_unwrap, move_to
