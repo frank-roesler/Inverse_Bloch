@@ -25,7 +25,7 @@ trainLogger = TrainLogger(start_logging=start_logging)
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
 
-    mxy, mz = blochsim_CK_batch_realPulse(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
+    mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 
     (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
         mz,
