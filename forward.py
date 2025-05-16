@@ -19,5 +19,5 @@ device = get_device()
 freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
 freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy = move_to((freq_offsets_Hz, G, B1, B0, M0, sens, t_B1, pos, target_z, target_xy), device)
 with torch.no_grad():
-    plot_off_resonance(B1, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
-    plot_some_b0_values(npts__some_b0_values, pos, sens, G, B1, B0, M0, target_xy, target_z, t_B1, dt)
+    plot_off_resonance(B1 + 0j, G, pos, sens, dt, B0=B0, M0=M0, freq_offsets_Hz=freq_offsets_Hz)
+    plot_some_b0_values(npts__some_b0_values, pos, sens, G, B1 + 0j, B0, M0, target_xy, target_z, t_B1, dt)

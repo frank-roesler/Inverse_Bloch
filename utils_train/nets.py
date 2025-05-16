@@ -162,7 +162,9 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
+    def __init__(
+        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
+    ):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]
@@ -211,7 +213,7 @@ class MixedModel_RealPulse(PulseGradientBase):
 
     def to(self, device):
         self.pulse_model = self.pulse_model.to(device)
-        self.gradient_value = self.gradient_value.to(device)
+        # self.gradient_value = torch.nn.Parameter(self.gradient_value.to(device))
         return super().to(device)
 
     def forward(self, x):

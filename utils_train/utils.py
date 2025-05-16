@@ -49,12 +49,15 @@ class TrainLogger:
         self.log["axes"] = axes
         self.log["flip_angle"] = flip_angle
         self.log["loss_metric"] = loss_metric
+        self.log["model_args"] = model_args
+        self.log["scanner_params"] = scanner_params
+        self.log["loss_weights"] = loss_weights
         return self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
         if epoch <= self.start_logging:
             return False
-        if not losses[-1] < 0.999 * self.best_loss:
+        if not losses[-1] < 0.99 * self.best_loss:
             return False
         self.best_loss = losses[-1]
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -135,7 +138,7 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
-        if epoch % self.output_every == 0:
+        if epoch % self.output_every == 0 or export_figure:
             pos = pos.cpu()[:, 2]
             fmin = -0.09  # torch.min(pos).item()
             fmax = 0.09  # torch.max(pos).item()
@@ -193,10 +196,10 @@ class InfoScreen:
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
             self.fig.canvas.draw()
-            if export_figure:
-                filename = "results/training.png"
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                plt.savefig(filename, dpi=300)
+            # if export_figure:
+            filename = "results/training.png"
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            plt.savefig(filename, dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 
@@ -205,8 +208,8 @@ class InfoScreen:
         self.add_line_collection_from_list(ax, line_list, linestyle)
 
     def add_line_collection_from_list(self, ax, line_list, linestyle):
-        cmap = cm.get_cmap("tab10", len(line_list))
-        colors = [cmap(i) for i in range(len(line_list))]
+        cmap = cm.get_cmap("inferno", len(line_list) + 2)
+        colors = [cmap(i + 1) for i in range(len(line_list) + 2)]
         line_collection = LineCollection(line_list, linewidths=0.7, colors=colors, linestyle=linestyle)
         ax.add_collection(line_collection)
 
@@ -288,7 +291,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -327,7 +330,7 @@ def loss_fn(
     if gradient.shape[0] > 1:
         gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
     else:
-        gradient_diff_loss = torch.Tensor([0.0])
+        gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
     phase_ddiff = torch.diff(phase_diff)
     phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
