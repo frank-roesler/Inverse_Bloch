@@ -6,7 +6,7 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
+target_z, target_xy, _ = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
 B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
@@ -24,6 +24,8 @@ trainLogger = TrainLogger(start_logging=start_logging)
 
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
+
+    pulse = pulse.real + 0j
 
     mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=dt)
 

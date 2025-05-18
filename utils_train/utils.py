@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
-import matplotlib.colors as mcolors
 import torch
 import numpy as np
 from params import model_args
@@ -374,6 +373,22 @@ def load_data(path):
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
     return pulse, gradient, target_z, target_xy, pos, dt, dx, sens, B0, tAx, t_B1, M0
+
+
+def load_data_old(path):
+    data_dict = torch.load(path, weights_only=False, map_location="cpu")
+    # epoch = data_dict["epoch"]
+    # L2_loss = data_dict["L2_loss"]
+    # D_loss = data_dict["D_loss"]
+    # losses = data_dict["losses"]
+    # model = data_dict["model"]
+    # optimizer = data_dict["optimizer"]
+    inputs = data_dict["inputs"]
+    target_z = data_dict["targets"]["target_z"]
+    target_xy = data_dict["targets"]["target_xy"]
+    pulse = data_dict["pulse"].detach().cpu()
+    gradient = data_dict["gradient"].detach().cpu()
+    return pulse, gradient, target_z, target_xy, inputs["pos"], inputs["dt"]
 
 
 def torch_unwrap(phase, discont=torch.pi):
