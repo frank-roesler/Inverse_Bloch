@@ -102,4 +102,6 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
         left += width + distance
 
     target_z = torch.sqrt(1 - target_xy**2)
-    return target_z, target_xy, centers, half_width
+    alpha = 20.0
+    weights_for_training = (alpha / torch.pi) / (1 + (alpha * posAx) ** 2)
+    return target_z, target_xy, centers, half_width, weights_for_training

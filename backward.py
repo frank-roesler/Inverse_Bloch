@@ -7,7 +7,7 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy, slice_centers, slice_half_width = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
+target_z, target_xy, slice_centers, slice_half_width, weights = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
 B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
 
@@ -56,7 +56,7 @@ for epoch in range(epochs + 1):
         gradient,
         mxy_t_integrated,
         1000 * dt,
-        t_B1=t_B1,
+        weights=weights,
         scanner_params=scanner_params,
         loss_weights=loss_weights,
         metric=loss_metric,

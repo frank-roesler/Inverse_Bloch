@@ -24,49 +24,41 @@ def time_loop(
         imStatea_t = imStatea[:, :, tt].clone()
         reStateb_t = reStateb[:, :, tt].clone()
         imStateb_t = imStateb[:, :, tt].clone()
-        reStatea[:, :, tt + 1] = (
-            reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
-        )
-        imStatea[:, :, tt + 1] = (
-            reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
-        )
-        reStateb[:, :, tt + 1] = (
-            reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
-        )
-        imStateb[:, :, tt + 1] = (
-            reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
-        )
+        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
+        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
+        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
+        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
     return (reStatea, imStatea, reStateb, imStateb)
 
 
+def sinc_of_root(small_x):
+    return 1 - small_x / 6 + small_x**2 / 120 + small_x**3 / 5040
+
+
+def cos_of_root(small_x):
+    return 1 - small_x / 2 + small_x**2 / 24 - small_x**3 / 720 + small_x**4 / 40320
+
+
+def compute_alpha_beta(bxy, bz, dt, gam):
+    normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
+    posNormPts = normSquared > 0
+    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=bxy.device, requires_grad=False)
+    Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
+    sinc_part = -1j * gam * dt * 0.5 * torch.sinc(Phi / 2 / torch.pi)
+    alpha = torch.cos(Phi / 2) - bz * sinc_part
+    beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
+    return alpha, beta
+
+
+def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam):
+    Phi_half_squared = (0.5 * dt * gam) ** 2 * ((bxy * torch.conj(bxy)).real + bz**2)  # Nb x Ns x Nt
+    sinc_part = -1j * gam * dt * 0.5 * sinc_of_root(Phi_half_squared)
+    alpha = cos_of_root(Phi_half_squared) - bz * sinc_part
+    beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
+    return alpha, beta
+
+
 def blochsim_CK_batch(B1, G, pos, sens, dx, B0_list, M0, slice_centers, slice_half_width, dt=6.4e-6):
-    """
-    Batch version of Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
-
-    Parameters
-    ----------
-    B1 : torch.Tensor
-        B1(t,c) = Nt x Nc tensor (RF pulse waveform for each coil)
-    G : torch.Tensor
-        [Gx(t) Gy(t) Gz(t)] = Nt x 3 tensor (Gradient waveforms)
-    pos : torch.Tensor
-        [x(:) y(:) z(:)] = Ns x 3 tensor (Spatial positions)
-    sens : torch.Tensor
-        [S1(:) S2(:) ...Sn(:)] = Ns x Nc tensor (Coil sensitivities)
-    B0_list : torch.Tensor
-        B0_list(k,:) = Ns x 1 tensor for each B0 value (Off-resonance field for each simulation)
-    M0 : torch.Tensor
-        Initial magnetization (default [0,0,1])
-    dt : float
-        Time step in seconds (default 6.4e-6)
-
-    Returns
-    -------
-    mxy_batch : torch.Tensor
-        Final transverse magnetization for each B0 value
-    mz_batch : torch.Tensor
-        Final longitudinal magnetization for each B0 value
-    """
     # Constants
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
     gam = 267522.1199722082  # radians per sec per mT
@@ -88,14 +80,7 @@ def blochsim_CK_batch(B1, G, pos, sens, dx, B0_list, M0, slice_centers, slice_ha
     # Add in chunks to avoid excessive memory usage
     bz = bz + B0_list  # Final shape: (Nb, Ns, Nt)
 
-    # Compute these out of loop
-    normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
-    posNormPts = normSquared > 0
-    Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=B1.device, requires_grad=False)
-    Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
-    sinc_part = -1j * gam * dt * 0.5 * my_sinc(Phi / 2)
-    alpha = torch.cos(Phi / 2) - bz * sinc_part
-    beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
+    alpha, beta = compute_alpha_beta_without_sqrt(bxy, bz, dt, gam)
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop(

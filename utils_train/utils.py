@@ -192,6 +192,7 @@ class InfoScreen:
             self.ax_phase.set_xlim(fmin, fmax)
             self.ax[0, 0].set_xlim(t[0], t[-1])
             self.ax[0, 1].set_xlim(t[0], t[-1])
+            self.ax[1, 2].set_xlim(t[0], t[-1])
             self.ax[0, 2].set_xlim(0, epoch + 1)
             self.ax[1, 0].set_ylim(-0.1, 1.1)
             self.ax[1, 1].set_ylim(-0.1, 1.1)
@@ -308,7 +309,7 @@ def loss_fn(
     gradient,
     mxy_t_integrated,
     delta_t,
-    t_B1,
+    weights,
     scanner_params,
     loss_weights,
     metric="L2",
@@ -316,11 +317,11 @@ def loss_fn(
 ):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
-        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).sum(dim=0)
-        loss_mz = torch.mean((z_profile - target_z) ** 2).sum(dim=0)
+        loss_mxy = torch.mean((weights * (xy_profile_abs - target_xy)) ** 2).sum(dim=0)
+        loss_mz = torch.mean((weights * (xy_profile_abs - target_xy)) ** 2).sum(dim=0)
     elif metric == "L1":
-        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
-        loss_mz = torch.mean(torch.abs(z_profile - target_z)).sum(dim=0)
+        loss_mxy = torch.mean(weights * torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
+        loss_mz = torch.mean(weights * torch.abs(z_profile - target_z)).sum(dim=0)
     else:
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
     boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).sum(dim=0)
@@ -332,13 +333,10 @@ def loss_fn(
     phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
     phase_diff_var = torch.var(phase_diff[:, target_xy[:-1] > 1e-6])
     phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
-    # mxy_t_integrals = torch.sum(t_B1.view(1, 1, 512) * mxy_t_integrated, dim=-1) * delta_t
 
     timeprof_diff = torch.diff(mxy_t_integrated, dim=-1)
     timeprof_diff[timeprof_diff < 0] = 0
-    com = (
-        torch.sum(torch.arange(timeprof_diff.shape[-1], device=z_profile.device) * timeprof_diff, dim=-1) / torch.sum(timeprof_diff, dim=-1) * delta_t
-    )
+    com = torch.sum(torch.arange(timeprof_diff.shape[-1], device=z_profile.device) * timeprof_diff, dim=-1) / torch.sum(timeprof_diff, dim=-1) * delta_t
 
     center_of_mass_loss = torch.var(com, dim=1).sum(dim=0)
 
