@@ -195,10 +195,10 @@ class InfoScreen:
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
             self.fig.canvas.draw()
-            # if export_figure:
-            filename = "results/training.png"
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            plt.savefig(filename, dpi=300)
+            if export_figure:
+                filename = "results/training.png"
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                plt.savefig(filename, dpi=300)
             plt.show(block=False)
             plt.pause(0.001)
 
