@@ -212,8 +212,8 @@ class InfoScreen:
         self.add_line_collection_from_list(ax, line_list)
 
     def add_line_collection_from_list(self, ax, line_list):
-        cmap = cm.get_cmap("inferno", len(line_list))
-        colors = [cmap(i) for i in range(len(line_list))]
+        cmap = cm.get_cmap("inferno", len(line_list) + 2)
+        colors = [cmap(i + 1) for i in range(len(line_list) + 2)]
         line_collection = LineCollection(line_list, linewidths=0.8, colors=colors)
         ax.add_collection(line_collection)
 
@@ -336,7 +336,9 @@ def loss_fn(
 
     timeprof_diff = torch.diff(mxy_t_integrated, dim=-1)
     timeprof_diff[timeprof_diff < 0] = 0
-    com = torch.sum(torch.arange(timeprof_diff.shape[-1]) * timeprof_diff, dim=-1) / torch.sum(timeprof_diff, dim=-1) * delta_t
+    com = (
+        torch.sum(torch.arange(timeprof_diff.shape[-1], device=z_profile.device) * timeprof_diff, dim=-1) / torch.sum(timeprof_diff, dim=-1) * delta_t
+    )
 
     center_of_mass_loss = torch.var(com, dim=1).sum(dim=0)
 

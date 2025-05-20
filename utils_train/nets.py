@@ -34,7 +34,7 @@ class PulseGradientBase(nn.Module):
             return model_output
         out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
         pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
-        gradient = self.gradient_scale * out_sign(model_output[:, 2:])
+        gradient = out_sign(self.gradient_scale * model_output[:, 2:])
         if self.tmin is None or self.tmax is None:
             return pulse, gradient
         bdry_scaling = (x - self.tmin) * (self.tmax - x)
@@ -161,7 +161,9 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
+    def __init__(
+        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
+    ):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]

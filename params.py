@@ -4,7 +4,7 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 10000
-lr = {"pulse": 1e-4, "gradient": 2e-5}  # learning rate
+lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
@@ -18,7 +18,7 @@ loss_weights = {
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
     "phase_loss": 10.0,
-    "center_of_mass_loss": 1.0,
+    "center_of_mass_loss": 0.1,
 }
 
 # BLOCH PARAMETERS:
@@ -39,8 +39,8 @@ model_args = {
     "center_spacing": 1,  # RBFN
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
-    "gradient_scale": 100.0,  # relative size of gradient to RF pulse
-    "positive_gradient": False,
+    "gradient_scale": 10.0,  # relative size of gradient to RF pulse
+    "positive_gradient": True,
     "tmin": t_B1[0].item(),
     "tmax": t_B1[-1].item(),
 }
