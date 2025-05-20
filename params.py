@@ -22,7 +22,7 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 3
+n_slices = 2
 n_b0_values = 1
 flip_angle = 17 / 45 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
