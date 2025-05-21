@@ -165,6 +165,8 @@ class InfoScreen:
                 collection.remove()
             for collection in self.ax[1, 2].collections:
                 collection.remove()
+            for collection in self.ax_phase.collections:
+                collection.remove()
             self.target_z_plot.set_xdata(pos)
             self.target_xy_plot.set_xdata(pos)
             self.phase_plot.set_xdata(pos)
@@ -178,7 +180,7 @@ class InfoScreen:
             self.target_xy_plot.set_ydata(target_xy)
             self.add_line_collection(self.ax[1, 0], pos, mz_plot)
             self.add_line_collection(self.ax[1, 1], pos, mxy_abs)
-            self.add_line_collection(self.ax[1, 1], pos, phase)
+            self.add_line_collection(self.ax_phase, pos, phase)
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
             self.pulse_imag_plot.set_ydata(pulse_imag)
@@ -310,6 +312,8 @@ def loss_fn(
     mxy_t_integrated,
     delta_t,
     weights,
+    slice_centers,
+    slice_half_width,
     scanner_params,
     loss_weights,
     metric="L2",
@@ -317,8 +321,8 @@ def loss_fn(
 ):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
-        loss_mxy = torch.mean((weights * (xy_profile_abs - target_xy)) ** 2).sum(dim=0)
-        loss_mz = torch.mean((weights * (xy_profile_abs - target_xy)) ** 2).sum(dim=0)
+        loss_mxy = torch.mean(weights * (xy_profile_abs - target_xy) ** 2).sum(dim=0)
+        loss_mz = torch.mean(weights * (z_profile - target_z) ** 2).sum(dim=0)
     elif metric == "L1":
         loss_mxy = torch.mean(weights * torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
         loss_mz = torch.mean(weights * torch.abs(z_profile - target_z)).sum(dim=0)
@@ -328,16 +332,21 @@ def loss_fn(
     gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).sum(dim=0)
     pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).sum(dim=0)
     gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
-    phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
+    where_slices = target_xy > 1e-1
+    phase = torch_unwrap(torch.angle(xy_profile))
+    phase_diff = torch.diff(phase)
     phase_ddiff = torch.diff(phase_diff)
-    phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
-    phase_diff_var = torch.var(phase_diff[:, target_xy[:-1] > 1e-6])
+    phase_ddiff = phase_ddiff[:, where_slices[1:-1]]
+    phase_diff_var = torch.var(phase_diff[:, where_slices[:-1]])
     phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
 
-    timeprof_diff = torch.diff(mxy_t_integrated, dim=-1)
-    timeprof_diff[timeprof_diff < 0] = 0
-    com = torch.sum(torch.arange(timeprof_diff.shape[-1], device=z_profile.device) * timeprof_diff, dim=-1) / torch.sum(timeprof_diff, dim=-1) * delta_t
-
+    phase_center_loss = torch.zeros((xy_profile.shape[0], len(slice_centers)), device=xy_profile.device)
+    for i, c in enumerate(slice_centers):
+        phase_center_loss[:, i] = torch.mean(phase[:, c - slice_half_width : c + slice_half_width], dim=1)
+    phase_center_loss = torch.diff(phase_center_loss, dim=1)
+    factor = torch.pi / len(slice_centers)
+    phase_center_loss = torch.mean((torch.abs(phase_center_loss) - factor) ** 2, dim=0)
+    com = delta_t * (mxy_t_integrated[:, :, -1] * mxy_t_integrated.shape[-1] - torch.sum(mxy_t_integrated, dim=-1))
     center_of_mass_loss = torch.var(com, dim=1).sum(dim=0)
 
     if verbose:
@@ -351,6 +360,7 @@ def loss_fn(
         print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
         print("center_of_mass_loss", loss_weights["center_of_mass_loss"] * center_of_mass_loss.item())
+        print("phase_center_loss", loss_weights["phase_center_loss"] * phase_center_loss.item())
         print("-" * 50)
     return (
         loss_weights["loss_mxy"] * loss_mxy,
@@ -361,6 +371,7 @@ def loss_fn(
         loss_weights["gradient_diff_loss"] * gradient_diff_loss,
         loss_weights["phase_loss"] * phase_loss,
         loss_weights["center_of_mass_loss"] * center_of_mass_loss,
+        loss_weights["phase_center_loss"] * phase_center_loss,
     )
 
 

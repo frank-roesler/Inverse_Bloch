@@ -18,12 +18,13 @@ loss_weights = {
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
     "phase_loss": 10.0,
-    "center_of_mass_loss": 0.1,
+    "center_of_mass_loss": 1.0,
+    "phase_center_loss": 0.01,
 }
 
 # BLOCH PARAMETERS:
 n_slices = 2
-n_b0_values = 1
+n_b0_values = 3
 flip_angle = 17 / 45 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 

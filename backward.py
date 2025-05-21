@@ -7,9 +7,11 @@ from params import *
 
 
 device = get_device()
-target_z, target_xy, slice_centers, slice_half_width, weights = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
+target_z, target_xy, slice_centers, slice_half_width, weights = get_smooth_targets(
+    theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices
+)
 
-B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy), device)
+B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy, weights = move_to((B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy, weights), device)
 
 model = get_model(modelname, **model_args)
 model_old = get_model(modelname, **model_args)
@@ -26,16 +28,7 @@ trainLogger = TrainLogger(start_logging=start_logging)
 for epoch in range(epochs + 1):
     pulse, gradient = model(t_B1)
     mxy, mz, mxy_t_integrated = blochsim_CK_batch(
-        B1=pulse,
-        G=gradient,
-        pos=pos,
-        sens=sens,
-        dx=dx,
-        B0_list=B0_list,
-        M0=M0,
-        slice_centers=slice_centers,
-        slice_half_width=slice_half_width,
-        dt=dt,
+        B1=pulse, G=gradient, pos=pos, sens=sens, dx=dx, B0_list=B0_list, M0=M0, slice_centers=slice_centers, slice_half_width=slice_half_width, dt=dt
     )
 
     (
@@ -47,6 +40,7 @@ for epoch in range(epochs + 1):
         gradient_diff_loss,
         phase_loss,
         center_of_mass_loss,
+        phase_center_loss,
     ) = loss_fn(
         mz,
         mxy,
@@ -56,13 +50,25 @@ for epoch in range(epochs + 1):
         gradient,
         mxy_t_integrated,
         1000 * dt,
-        weights=weights,
+        weights,
+        slice_centers,
+        slice_half_width,
         scanner_params=scanner_params,
         loss_weights=loss_weights,
         metric=loss_metric,
         verbose=True,
     )
-    loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
+    loss = (
+        loss_mxy
+        + loss_mz
+        + gradient_height_loss
+        + gradient_diff_loss
+        + pulse_height_loss
+        + boundary_vals_pulse
+        + phase_loss
+        + center_of_mass_loss
+        + phase_center_loss
+    )
 
     lossItem = loss.item()
     losses.append(lossItem)
@@ -70,13 +76,17 @@ for epoch in range(epochs + 1):
     loss.backward()
     if suppress_loss_peaks:
         # model = regularize_model_gradients(model)
-        if epoch > 100 and losses[-1] > 2 * losses[-2]:
+        if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
             model.load_state_dict(model_old.state_dict())
-            print("EXPLOSION!!! MODEL RESET")
+            print("EXPLOSION!!! MODEL RESETTED")
         else:
-            model_old.load_state_dict(model.state_dict())
-    optimizer.step()
-    scheduler.step(lossItem)
+            if epoch % 10 == 0:
+                model_old.load_state_dict(model.state_dict())
+            optimizer.step()
+            scheduler.step(lossItem)
+    else:
+        optimizer.step()
+        scheduler.step(lossItem)
 
     new_optimum = trainLogger.log_epoch(
         epoch,
@@ -93,18 +103,5 @@ for epoch in range(epochs + 1):
         {"target_z": target_z, "target_xy": target_xy},
         {"tAx": tAx, "fAx": fAx, "t_B1": t_B1},
     )
-    infoscreen.plot_info(
-        epoch,
-        losses,
-        pos,
-        t_B1,
-        target_z,
-        target_xy,
-        mz,
-        mxy,
-        mxy_t_integrated,
-        pulse,
-        gradient,
-        new_optimum,
-    )
+    infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, mxy_t_integrated, pulse, gradient, new_optimum)
     infoscreen.print_info(epoch, lossItem, optimizer)
