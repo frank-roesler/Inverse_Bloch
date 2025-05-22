@@ -3,6 +3,34 @@ import torch
 from utils_bloch.blochsim_CK import my_sinc
 
 
+# @torch.jit.script
+# def time_loop(
+#     reAlpha: torch.Tensor,
+#     reBeta: torch.Tensor,
+#     imAlpha: torch.Tensor,
+#     imBeta: torch.Tensor,
+#     Nb: int,
+#     Ns: int,
+#     Nt: int,
+#     device: torch.device,
+# ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+#     reStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+#     reStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+#     imStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+#     imStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
+#     reStatea[:, :, 0] = 1.0
+#     for tt in range(Nt - 1):
+#         reStatea_t = reStatea[:, :, tt].clone()
+#         imStatea_t = imStatea[:, :, tt].clone()
+#         reStateb_t = reStateb[:, :, tt].clone()
+#         imStateb_t = imStateb[:, :, tt].clone()
+#         reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
+#         imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
+#         reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
+#         imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
+#     return (reStatea, imStatea, reStateb, imStateb)
+
+
 @torch.jit.script
 def time_loop(
     reAlpha: torch.Tensor,
@@ -19,16 +47,23 @@ def time_loop(
     imStatea = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
     imStateb = torch.zeros((Nb, Ns, Nt), dtype=torch.float32, device=device)
     reStatea[:, :, 0] = 1.0
+
     for tt in range(Nt - 1):
         reStatea_t = reStatea[:, :, tt].clone()
         imStatea_t = imStatea[:, :, tt].clone()
         reStateb_t = reStateb[:, :, tt].clone()
         imStateb_t = imStateb[:, :, tt].clone()
-        reStatea[:, :, tt + 1] = reAlpha[:, :, tt] * reStatea_t - imAlpha[:, :, tt] * imStatea_t - (reBeta[:, :, tt] * reStateb_t + imBeta[:, :, tt] * imStateb_t)
-        imStatea[:, :, tt + 1] = reAlpha[:, :, tt] * imStatea_t + imAlpha[:, :, tt] * reStatea_t - (reBeta[:, :, tt] * imStateb_t - imBeta[:, :, tt] * reStateb_t)
-        reStateb[:, :, tt + 1] = reBeta[:, :, tt] * reStatea_t - imBeta[:, :, tt] * imStatea_t + (reAlpha[:, :, tt] * reStateb_t + imAlpha[:, :, tt] * imStateb_t)
-        imStateb[:, :, tt + 1] = reBeta[:, :, tt] * imStatea_t + imBeta[:, :, tt] * reStatea_t + (reAlpha[:, :, tt] * imStateb_t - imAlpha[:, :, tt] * reStateb_t)
-    return (reStatea, imStatea, reStateb, imStateb)
+
+        reAlpha_tt = reAlpha[:, :, tt]
+        imAlpha_tt = imAlpha[:, :, tt]
+        reBeta_tt = reBeta[:, :, tt]
+        imBeta_tt = imBeta[:, :, tt]
+
+        reStatea[:, :, tt + 1] = reAlpha_tt * reStatea_t - imAlpha_tt * imStatea_t - (reBeta_tt * reStateb_t + imBeta_tt * imStateb_t)
+        imStatea[:, :, tt + 1] = reAlpha_tt * imStatea_t + imAlpha_tt * reStatea_t - (reBeta_tt * imStateb_t - imBeta_tt * reStateb_t)
+        reStateb[:, :, tt + 1] = reBeta_tt * reStatea_t - imBeta_tt * imStatea_t + (reAlpha_tt * reStateb_t + imAlpha_tt * imStateb_t)
+        imStateb[:, :, tt + 1] = reBeta_tt * imStatea_t + imBeta_tt * reStatea_t + (reAlpha_tt * imStateb_t - imAlpha_tt * reStateb_t)
+    return reStatea, imStatea, reStateb, imStateb
 
 
 def sinc_of_root(small_x):

@@ -105,7 +105,6 @@ class InfoScreen:
         self.loss_plot = self.ax[0, 2].semilogy([0], [1e-1], linewidth=0.9, label="Loss")[0]
         self.target_z_plot = self.ax[1, 0].plot([0], [1], linewidth=0.9, label="Target_z")[0]
         self.target_xy_plot = self.ax[1, 1].plot([0], [1], linewidth=0.9, label="Target_xy")[0]
-        self.phase_plot = self.ax_phase.plot([0], [1], linewidth=0.7, label="Phase", color="g")[0]
 
         # Set titles and legends
         self.ax[0, 0].set_title("Pulse")
@@ -140,7 +139,7 @@ class InfoScreen:
         export_figure,
     ):
         """plots info curves during training"""
-        if epoch % self.output_every == 0:
+        if epoch % self.output_every == 0 or epoch < 10:
             pos = pos.detach().cpu().numpy()[:, 2]
             fmin = -0.09  # torch.min(pos).item()
             fmax = 0.09  # torch.max(pos).item()
@@ -169,7 +168,6 @@ class InfoScreen:
                 collection.remove()
             self.target_z_plot.set_xdata(pos)
             self.target_xy_plot.set_xdata(pos)
-            self.phase_plot.set_xdata(pos)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
@@ -291,7 +289,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=30, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -300,6 +298,34 @@ def threshold_loss(x, threshold):
     threshold_loss = torch.max(torch.abs(x)) - threshold
     threshold_loss[threshold_loss < 0] = 0.0
     return threshold_loss**2
+
+
+def compute_phase_center_loss(phase, slice_centers, slice_half_width):
+    slice_masks = torch.stack(
+        [
+            (torch.arange(phase.size(1), device=phase.device) >= c - slice_half_width)
+            & (torch.arange(phase.size(1), device=phase.device) < c + slice_half_width)
+            for c in slice_centers
+        ],
+        dim=0,
+    )  # Shape: (num_slices, num_points)
+    slice_masks = slice_masks.T  # Shape: (num_points, num_slices)
+    phase_center_loss = torch.einsum("bp,ps->bs", phase, slice_masks.float()) / slice_masks.sum(dim=0, keepdim=True)
+    phase_center_loss = torch.diff(phase_center_loss, dim=1)
+    factor = torch.pi / len(slice_centers)
+    phase_center_loss = torch.mean((torch.abs(phase_center_loss) - factor) ** 2, dim=0)
+
+    return phase_center_loss
+
+
+def compute_phase_center_loss_old(xy_profile, phase, slice_centers, slice_half_width):
+    phase_center_loss = torch.zeros((xy_profile.shape[0], len(slice_centers)), device=xy_profile.device)
+    for i, c in enumerate(slice_centers):
+        phase_center_loss[:, i] = torch.mean(phase[:, c - slice_half_width : c + slice_half_width], dim=1)
+    phase_center_loss = torch.diff(phase_center_loss, dim=1)
+    factor = torch.pi / len(slice_centers)
+    phase_center_loss = torch.mean(((torch.abs(phase_center_loss) - factor) % (2 * torch.pi)) ** 2, dim=0)
+    return phase_center_loss
 
 
 def loss_fn(
@@ -340,12 +366,14 @@ def loss_fn(
     phase_diff_var = torch.var(phase_diff[:, where_slices[:-1]])
     phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
 
-    phase_center_loss = torch.zeros((xy_profile.shape[0], len(slice_centers)), device=xy_profile.device)
-    for i, c in enumerate(slice_centers):
-        phase_center_loss[:, i] = torch.mean(phase[:, c - slice_half_width : c + slice_half_width], dim=1)
-    phase_center_loss = torch.diff(phase_center_loss, dim=1)
-    factor = torch.pi / len(slice_centers)
-    phase_center_loss = torch.mean((torch.abs(phase_center_loss) - factor) ** 2, dim=0)
+    # t0 = time()
+    phase_center_loss = compute_phase_center_loss_old(xy_profile, phase, slice_centers, slice_half_width)
+    # t1 = time()
+    # phase_center_loss = compute_phase_center_loss(phase, slice_centers, slice_half_width)
+    # t2 = time()
+    # print("compute_phase_center_loss_old", t1 - t0)
+    # print("compute_phase_center_loss", t2 - t1)
+    # print("error", phase_center_loss_old - phase_center_loss)
     com = delta_t * (mxy_t_integrated[:, :, -1] * mxy_t_integrated.shape[-1] - torch.sum(mxy_t_integrated, dim=-1))
     center_of_mass_loss = torch.var(com, dim=1).sum(dim=0)
 
