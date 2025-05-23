@@ -38,7 +38,11 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1):
     B0 = B0.contiguous()
     t_B1 = t_B1.contiguous()
     M0 = M0.contiguous()
-    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_b0_values)
+    if n_b0_values == 1:
+        freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 2)
+        freq_offsets_Hz = torch.mean(freq_offsets_Hz, dim=0, keepdim=True)
+    else:
+        freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_b0_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_vals = []
     for ff in range(len(freq_offsets_Hz)):

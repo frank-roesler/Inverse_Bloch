@@ -4,7 +4,7 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 epochs = 15000
-lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
+lr = {"pulse": 2e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
@@ -17,14 +17,14 @@ loss_weights = {
     "gradient_height_loss": 0.1,
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
-    "phase_loss": 100.0,
+    "phase_loss": 10.0,
     "center_of_mass_loss": 0.1,
-    "phase_center_loss": 0.01,
+    "phase_center_loss": 0.001,
 }
 
 # BLOCH PARAMETERS:
-n_slices = 2
-n_b0_values = 5
+n_slices = 1
+n_b0_values = 3
 flip_angle = 17 / 45 * np.pi
 pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 

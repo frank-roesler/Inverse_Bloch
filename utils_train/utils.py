@@ -141,8 +141,8 @@ class InfoScreen:
         """plots info curves during training"""
         if epoch % self.output_every == 0 or epoch < 10:
             pos = pos.detach().cpu().numpy()[:, 2]
-            fmin = -0.09  # torch.min(pos).item()
-            fmax = 0.09  # torch.max(pos).item()
+            fmin = np.min(pos).item()
+            fmax = np.max(pos).item()
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
@@ -347,11 +347,11 @@ def loss_fn(
 ):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
-        loss_mxy = torch.mean(weights * (xy_profile_abs - target_xy) ** 2).sum(dim=0)
-        loss_mz = torch.mean(weights * (z_profile - target_z) ** 2).sum(dim=0)
+        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).sum(dim=0)
+        loss_mz = torch.mean((z_profile - target_z) ** 2).sum(dim=0)
     elif metric == "L1":
-        loss_mxy = torch.mean(weights * torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
-        loss_mz = torch.mean(weights * torch.abs(z_profile - target_z)).sum(dim=0)
+        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
+        loss_mz = torch.mean(torch.abs(z_profile - target_z)).sum(dim=0)
     else:
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
     boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).sum(dim=0)
@@ -367,15 +367,15 @@ def loss_fn(
     phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
 
     # t0 = time()
-    phase_center_loss = compute_phase_center_loss_old(xy_profile, phase, slice_centers, slice_half_width)
+    phase_center_loss = 0  # compute_phase_center_loss_old(xy_profile, phase, slice_centers, slice_half_width)
     # t1 = time()
     # phase_center_loss = compute_phase_center_loss(phase, slice_centers, slice_half_width)
     # t2 = time()
     # print("compute_phase_center_loss_old", t1 - t0)
     # print("compute_phase_center_loss", t2 - t1)
     # print("error", phase_center_loss_old - phase_center_loss)
-    com = delta_t * (mxy_t_integrated[:, :, -1] * mxy_t_integrated.shape[-1] - torch.sum(mxy_t_integrated, dim=-1))
-    center_of_mass_loss = torch.var(com, dim=1).sum(dim=0)
+    # com = delta_t * (mxy_t_integrated[:, :, -1] * mxy_t_integrated.shape[-1] - torch.sum(mxy_t_integrated, dim=-1))
+    center_of_mass_loss = 0  # torch.var(com, dim=1).sum(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -387,8 +387,8 @@ def loss_fn(
         print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
         print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
-        print("center_of_mass_loss", loss_weights["center_of_mass_loss"] * center_of_mass_loss.item())
-        print("phase_center_loss", loss_weights["phase_center_loss"] * phase_center_loss.item())
+        # print("center_of_mass_loss", loss_weights["center_of_mass_loss"] * center_of_mass_loss.item())
+        # print("phase_center_loss", loss_weights["phase_center_loss"] * phase_center_loss.item())
         print("-" * 50)
     return (
         loss_weights["loss_mxy"] * loss_mxy,

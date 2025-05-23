@@ -70,7 +70,7 @@ class FourierPulse(nn.Module):
     def __init__(self, t_min, t_max, n_coeffs=101, **kwargs):
         super().__init__()
         self.tpulse = t_max - t_min
-        p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
+        p = 5e-3 * torch.randn((2 * n_coeffs + 1, 2))
         weights = torch.exp(-0.1 * ((torch.arange(-n_coeffs, n_coeffs + 1)) ** 2))
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
@@ -137,7 +137,7 @@ class SIREN(PulseGradientBase):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
         init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
-        init.uniform_(self.final_layer.bias, a=2 * initial_weight_bound, b=4 * initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=0.3, b=0.35)
 
     def forward(self, x):
         x_orig = x.clone()

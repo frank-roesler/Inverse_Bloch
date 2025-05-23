@@ -67,7 +67,7 @@ def time_loop(
 
 
 def sinc_of_root(small_x):
-    return 1 - small_x / 6 + small_x**2 / 120 + small_x**3 / 5040
+    return 1 - small_x / 6 + small_x**2 / 120 + small_x**3 / 5040 + small_x**4 / 362880
 
 
 def cos_of_root(small_x):
@@ -78,9 +78,9 @@ def compute_alpha_beta(bxy, bz, dt, gam):
     normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=bxy.device, requires_grad=False)
-    Phi[posNormPts] = dt * gam * torch.sqrt(normSquared[posNormPts])
-    sinc_part = -1j * gam * dt * 0.5 * torch.sinc(Phi / 2 / torch.pi)
-    alpha = torch.cos(Phi / 2) - bz * sinc_part
+    Phi[posNormPts] = 0.5 * dt * gam * torch.sqrt(normSquared[posNormPts])
+    sinc_part = -1j * gam * dt * 0.5 * torch.sinc(Phi / torch.pi)
+    alpha = torch.cos(Phi) - bz * sinc_part
     beta = -bxy.unsqueeze(0) * sinc_part  # Nb x Ns x Nt
     return alpha, beta
 
@@ -115,7 +115,8 @@ def blochsim_CK_batch(B1, G, pos, sens, dx, B0_list, M0, slice_centers, slice_ha
     # Add in chunks to avoid excessive memory usage
     bz = bz + B0_list  # Final shape: (Nb, Ns, Nt)
 
-    alpha, beta = compute_alpha_beta_without_sqrt(bxy, bz, dt, gam)
+    alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
+    # alpha, beta = compute_alpha_beta_without_sqrt(bxy, bz, dt, gam)
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop(
