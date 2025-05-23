@@ -7,6 +7,7 @@ import torch
 import numpy as np
 from params import model_args
 import os
+import datetime
 import json
 from utils_bloch import blochsim_CK_batch, blochsim_CK_batch_realPulse
 
@@ -347,6 +348,16 @@ def loss_fn(
 
 
 def load_data(path, mode="inference"):
+    creation_time = os.path.getctime(path)
+    creation_datetime = datetime.datetime.fromtimestamp(creation_time)
+    refactor_date = datetime.datetime(2025, 5, 23)
+    if creation_datetime < refactor_date:
+        return load_data_legacy(path, mode=mode)
+    else:
+        return load_data_new(path, mode=mode)
+
+
+def load_data_new(path, mode="inference"):
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
@@ -366,21 +377,40 @@ def load_data(path, mode="inference"):
     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
 
 
-def load_data_legacy(path):
+def load_data_legacy(path, mode="inference"):
+    import params
+
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
-    # epoch = data_dict["epoch"]
-    # L2_loss = data_dict["L2_loss"]
-    # D_loss = data_dict["D_loss"]
-    # losses = data_dict["losses"]
-    # model = data_dict["model"]
-    # optimizer = data_dict["optimizer"]
-    # inputs = data_dict["inputs"]
-    (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
-    pulse = data_dict["pulse"].detach().cpu()
-    gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient, target_z, target_xy, pos, dt, dx, sens, B0, tAx, t_B1, M0
+    if mode == "inference":
+        pulse = data_dict["pulse"].detach().cpu()
+        gradient = data_dict["gradient"].detach().cpu()
+        return pulse, gradient, target_z, target_xy
+    epoch = data_dict["epoch"]
+    losses = data_dict["losses"]
+    model = data_dict["model"]
+    optimizer = data_dict["optimizer"]
+    (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
+    fixed_inputs = params.fixed_inputs
+
+    fixed_inputs["pos"] = pos
+    fixed_inputs["dt"] = dt
+    fixed_inputs["dx"] = dx
+    fixed_inputs["Nz"] = Nz
+    fixed_inputs["sens"] = sens
+    fixed_inputs["B0"] = B0
+    fixed_inputs["tAx"] = tAx
+    fixed_inputs["fAx"] = fAx
+    fixed_inputs["t_B1"] = t_B1
+    fixed_inputs["M0"] = M0
+    fixed_inputs["inputs"] = inputs
+    flip_angle = data_dict["flip_angle"] if "flip_angle" in data_dict else params.flip_angle
+    loss_metric = data_dict["loss_metric"] if "loss_metric" in data_dict else params.loss_metric
+    scanner_params = data_dict["scanner_params"] if "scanner_params" in data_dict else params.scanner_params
+    loss_weights = data_dict["loss_weights"] if "loss_weights" in data_dict else params.loss_weights
+
+    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
 
 
 def load_data_old(path):

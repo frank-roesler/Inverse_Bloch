@@ -14,7 +14,21 @@ if suppress_loss_peaks:
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 if resume_from_path != None:
     pre_train_inputs = False
-    (model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, start_epoch) = load_data(resume_from_path, mode="train")
+    (
+        model,
+        target_z,
+        target_xy,
+        optimizer,
+        losses,
+        fixed_inputs,
+        flip_angle,
+        loss_metric,
+        scanner_params,
+        loss_weights,
+        start_epoch,
+    ) = load_data(resume_from_path, mode="train")
+    for param_group in optimizer.param_groups:
+        param_group["lr"] *= 0.5
 
 
 train(
