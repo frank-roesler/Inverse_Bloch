@@ -26,7 +26,7 @@ if resume_from_path != None:
         scanner_params,
         loss_weights,
         start_epoch,
-    ) = load_data(resume_from_path, mode="train")
+    ) = load_data_legacy(resume_from_path, mode="train")
     for param_group in optimizer.param_groups:
         param_group["lr"] *= 0.5
 

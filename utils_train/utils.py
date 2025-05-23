@@ -484,21 +484,55 @@ def train(
     plot_loss_freq,
     pre_train_inputs=False,
 ):
-    B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to(
-        (fixed_inputs["B0"], fixed_inputs["B0_list"], fixed_inputs["M0"], fixed_inputs["sens"], fixed_inputs["t_B1"], fixed_inputs["pos"], target_z, target_xy), device
+    B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy, model = move_to(
+        (
+            fixed_inputs["B0"],
+            fixed_inputs["B0_list"],
+            fixed_inputs["M0"],
+            fixed_inputs["sens"],
+            fixed_inputs["t_B1"],
+            fixed_inputs["pos"],
+            target_z,
+            target_xy,
+            model,
+        ),
+        device,
     )
+    for state in optimizer.state.values():
+        for k, v in state.items():
+            if isinstance(v, torch.Tensor):
+                state[k] = v.to(device)
 
     if pre_train_inputs:
         B1, G, fixed_inputs, _ = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
         model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr={"pulse": 1e-4, "gradient": 2e-4}, thr=1e-5, device=device)
 
     infoscreen = InfoScreen(output_every=plot_loss_freq)
-    trainLogger = TrainLogger(fixed_inputs, flip_angle, loss_metric, {"target_z": target_z, "target_xy": target_xy}, model_args, scanner_params, loss_weights, start_logging=start_logging)
+    trainLogger = TrainLogger(
+        fixed_inputs,
+        flip_angle,
+        loss_metric,
+        {"target_z": target_z, "target_xy": target_xy},
+        model_args,
+        scanner_params,
+        loss_weights,
+        start_logging=start_logging,
+    )
     for epoch in range(start_epoch, epochs + 1):
         pulse, gradient = model(t_B1)
         mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=fixed_inputs["dt"])
         (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
-            mz, mxy, target_z, target_xy, pulse, gradient, 1000 * fixed_inputs["dt"], scanner_params=scanner_params, loss_weights=loss_weights, metric=loss_metric, verbose=True
+            mz,
+            mxy,
+            target_z,
+            target_xy,
+            pulse,
+            gradient,
+            1000 * fixed_inputs["dt"],
+            scanner_params=scanner_params,
+            loss_weights=loss_weights,
+            metric=loss_metric,
+            verbose=True,
         )
         loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
