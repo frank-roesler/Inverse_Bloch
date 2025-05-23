@@ -5,13 +5,15 @@ from utils_train.utils import torch_unwrap, move_to
 import os
 
 
-def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz, path=None):
+def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None):
     from params import flip_angle
 
     npts = len(freq_offsets_Hz)
-    [mxy_profile, mz_profile] = blochsim_CK_freqprof(rf, grad, pos=pos, sens=sens, B0=B0, M0=M0, dt=dt, freq_offsets_Hz=freq_offsets_Hz)
+    [mxy_profile, mz_profile] = blochsim_CK_freqprof(
+        rf, grad, pos=fixed_inputs["pos"], sens=fixed_inputs["sens"], B0=fixed_inputs["B0"], M0=fixed_inputs["M0"], dt=fixed_inputs["dt"], freq_offsets_Hz=freq_offsets_Hz
+    )
 
-    (mxy_profile, mz_profile, pos) = move_to((mxy_profile, mz_profile, pos), torch.device("cpu"))
+    (mxy_profile, mz_profile, pos) = move_to((mxy_profile, mz_profile, fixed_inputs["pos"]), torch.device("cpu"))
 
     fig, axes = plt.subplots(1, 3, figsize=(14.5, 4))
     img_extent = [
@@ -70,17 +72,20 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz, path=No
     plt.show()
 
 
-def plot_some_b0_values(n_values, pos, sens, G, B1, B0, M0, target_xy, target_z, t_B1, dt, slice_centers, half_width, path=None):
-    from params import gamma_hz_mt
+def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=None):
+    from params import fixed_inputs
 
+    gamma_hz_mt = fixed_inputs["gam_hz_mt"]
+    t_B1 = fixed_inputs["t_B1"]
+    pos = fixed_inputs["pos"]
     freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
-        B0_list.append(B0 + B0_freq_offsets_mT[ff])
+        B0_list.append(fixed_inputs["B0"] + B0_freq_offsets_mT[ff])
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
-    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=sens, B0_list=B0, M0=M0, dt=dt)
+    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt"])
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):

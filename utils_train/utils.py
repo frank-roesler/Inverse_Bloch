@@ -361,10 +361,6 @@ def load_data_new(path, mode="inference"):
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
-    if mode == "inference":
-        pulse = data_dict["pulse"].detach().cpu()
-        gradient = data_dict["gradient"].detach().cpu()
-        return pulse, gradient, target_z, target_xy
     epoch = data_dict["epoch"]
     losses = data_dict["losses"]
     model = data_dict["model"]
@@ -374,6 +370,10 @@ def load_data_new(path, mode="inference"):
     loss_metric = data_dict["loss_metric"]
     scanner_params = data_dict["scanner_params"]
     loss_weights = data_dict["loss_weights"]
+    if mode == "inference":
+        pulse = data_dict["pulse"].detach().cpu()
+        gradient = data_dict["gradient"].detach().cpu()
+        return pulse, gradient, target_z, target_xy, fixed_inputs
     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
 
 
@@ -383,10 +383,6 @@ def load_data_legacy(path, mode="inference"):
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
-    if mode == "inference":
-        pulse = data_dict["pulse"].detach().cpu()
-        gradient = data_dict["gradient"].detach().cpu()
-        return pulse, gradient, target_z, target_xy
     epoch = data_dict["epoch"]
     losses = data_dict["losses"]
     model = data_dict["model"]
@@ -410,6 +406,10 @@ def load_data_legacy(path, mode="inference"):
     scanner_params = data_dict["scanner_params"] if "scanner_params" in data_dict else params.scanner_params
     loss_weights = data_dict["loss_weights"] if "loss_weights" in data_dict else params.loss_weights
 
+    if mode == "inference":
+        pulse = data_dict["pulse"].detach().cpu()
+        gradient = data_dict["gradient"].detach().cpu()
+        return pulse, gradient, target_z, target_xy, fixed_inputs
     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
 
 
