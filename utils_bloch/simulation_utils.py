@@ -4,7 +4,7 @@ import torch
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
-    from params import gamma
+    from params import fixed_inputs
 
     # Constants
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
@@ -25,7 +25,7 @@ def setup_simulation(G, pos, sens, B0_list, B1):
 
     # Add in chunks to avoid excessive memory usage
     bz += B0_list  # Final shape: (Nb, Ns, Nt)
-    return gamma, Nb, Ns, Nt, bxy, bz
+    return fixed_inputs["gam"], Nb, Ns, Nt, bxy, bz
 
 
 def my_sinc(x):

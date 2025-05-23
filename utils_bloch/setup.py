@@ -44,7 +44,23 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1):
     for ff in range(len(freq_offsets_Hz)):
         B0_vals.append(B0 + B0_freq_offsets_mT[ff])
     B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
-    return (pos, dt, dx.item(), Nz, sens, B0, tAx, fAx, t_B1.unsqueeze(1), M0, inputs, freq_offsets_Hz, B0_list, gam, gam_hz_mt)
+    return {
+        "pos": pos,
+        "dt": dt,
+        "dx": dx.item(),
+        "Nz": Nz,
+        "sens": sens,
+        "B0": B0,
+        "tAx": tAx,
+        "fAx": fAx,
+        "t_B1": t_B1.unsqueeze(1),
+        "M0": M0,
+        "inputs": inputs,
+        "freq_offsets_Hz": freq_offsets_Hz,
+        "B0_list": B0_list,
+        "gam": gam,
+        "gam_hz_mt": gam_hz_mt,
+    }
 
 
 def get_targets(theta=0.0):
@@ -88,14 +104,18 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     """higher smoothness values give sharper transitions"""
     import params
 
-    posAx = params.pos[:, 2]
+    posAx = params.fixed_inputs["pos"][:, 2]
     smoothness *= 1000.0
 
     width = 0.02
     distance = 0.01
     left = -0.5 * (width * n_targets + distance * (n_targets - 1))
 
-    target_xy = torch.zeros(params.pos[:, 2].shape, dtype=torch.float32, requires_grad=False)
+    pos0 = np.argmin(np.abs(posAx)).item()
+    posAtWidth = np.argmin(np.abs(posAx - width / 2)).item()
+    half_width = posAtWidth - pos0
+
+    target_xy = torch.zeros(posAx.shape, dtype=torch.float32, requires_grad=False)
     centers = []
     for i in range(n_targets):
         target_xy += smooth_square_well(
@@ -110,4 +130,4 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
         left += width + distance
 
     target_z = torch.sqrt(1 - target_xy**2)
-    return target_z, target_xy, centers
+    return target_z, target_xy, centers, half_width

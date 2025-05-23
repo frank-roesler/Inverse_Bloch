@@ -8,49 +8,37 @@ import numpy as np
 from params import model_args
 import os
 import json
+from utils_bloch import blochsim_CK_batch, blochsim_CK_batch_realPulse
 
 
 class TrainLogger:
-    def __init__(self, start_logging=1):
+    def __init__(self, fixed_inputs, flip_angle, loss_metric, targets, model_args, scanner_params, loss_weights, start_logging=1):
         self.log = {}
         self.start_logging = start_logging
         self.best_loss = np.inf
+        self.fixed_inputs = fixed_inputs
+        self.flip_angle = flip_angle
+        self.loss_metric = loss_metric
+        self.targets = targets
+        self.model_args = model_args
+        self.scanner_params = scanner_params
+        self.loss_weights = loss_weights
+        self.log["flip_angle"] = self.flip_angle
+        self.log["loss_metric"] = self.loss_metric
+        self.log["model_args"] = model_args
+        self.log["scanner_params"] = self.scanner_params
+        self.log["loss_weights"] = self.loss_weights
+        self.log["fixed_inputs"] = self.fixed_inputs
+        self.log["targets"] = self.targets
 
-    def log_epoch(
-        self,
-        epoch,
-        L2_loss,
-        D_loss,
-        losses,
-        model,
-        optimizer,
-        pulse,
-        gradient,
-        fixed_inputs,
-        flip_angle,
-        loss_metric,
-        targets,
-        axes,
-        model_args,
-        scanner_params,
-        loss_weights,
-    ):
+    def log_epoch(self, epoch, total_loss, losses, model, optimizer, pulse, gradient):
         self.log["epoch"] = epoch
-        self.log["L2_loss"] = L2_loss.item()
-        self.log["D_loss"] = D_loss.item()
+        self.log["L2_loss"] = total_loss.item()
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
-        self.log["inputs"] = fixed_inputs
-        self.log["targets"] = targets
         self.log["pulse"] = pulse
         self.log["gradient"] = gradient
-        self.log["axes"] = axes
-        self.log["flip_angle"] = flip_angle
-        self.log["loss_metric"] = loss_metric
-        self.log["model_args"] = model_args
-        self.log["scanner_params"] = scanner_params
-        self.log["loss_weights"] = loss_weights
         return self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
@@ -69,14 +57,14 @@ class TrainLogger:
     def export_json(self, directory="results"):
         modelname = self.log["model"].name
         export_path = os.path.join(directory, f"sms_nn_{modelname}.json")
-        dur = 1000 * self.log["axes"]["t_B1"][-1].item()
+        dur = 1000 * self.log["fixed_inputs"]["t_B1"][-1].item()
 
         data = {
             "id": "sms_nn_150425_MLP_square2",
             "set": {
                 "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
                 "dur": dur,
-                "pts": len(self.log["axes"]["t_B1"]),
+                "pts": len(self.log["fixed_inputs"]["t_B1"]),
                 "amplInt": None,
                 "refocFract": None,
             },
@@ -168,7 +156,7 @@ class InfoScreen:
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
             self.pulse_abs_plot.set_xdata(t)
-            self.loss_plot.set_xdata(np.arange(epoch + 1))
+            self.loss_plot.set_xdata(np.arange(len(losses)))
 
             self.add_line_collection(self.ax_bottom_left, pos, mz_plot)
             self.add_line_collection(self.ax_bottom_right, pos, mxy_abs)
@@ -358,7 +346,27 @@ def loss_fn(
     )
 
 
-def load_data(path):
+def load_data(path, mode="inference"):
+    data_dict = torch.load(path, weights_only=False, map_location="cpu")
+    target_z = data_dict["targets"]["target_z"]
+    target_xy = data_dict["targets"]["target_xy"]
+    if mode == "inference":
+        pulse = data_dict["pulse"].detach().cpu()
+        gradient = data_dict["gradient"].detach().cpu()
+        return pulse, gradient, target_z, target_xy
+    epoch = data_dict["epoch"]
+    losses = data_dict["losses"]
+    model = data_dict["model"]
+    optimizer = data_dict["optimizer"]
+    fixed_inputs = data_dict["fixed_inputs"]
+    flip_angle = data_dict["flip_angle"]
+    loss_metric = data_dict["loss_metric"]
+    scanner_params = data_dict["scanner_params"]
+    loss_weights = data_dict["loss_weights"]
+    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
+
+
+def load_data_legacy(path):
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
     # epoch = data_dict["epoch"]
     # L2_loss = data_dict["L2_loss"]
@@ -425,3 +433,52 @@ def regularize_model_gradients(model):
             param.grad.data.mul_(factor)
     print(f"Gradient norm scaling down by {factor}")
     return model
+
+
+def train(
+    model,
+    target_z,
+    target_xy,
+    optimizer,
+    scheduler,
+    losses,
+    fixed_inputs,
+    flip_angle,
+    loss_metric,
+    scanner_params,
+    loss_weights,
+    start_epoch,
+    epochs,
+    device,
+    start_logging,
+    plot_loss_freq,
+    pre_train_inputs=False,
+):
+    B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy = move_to(
+        (fixed_inputs["B0"], fixed_inputs["B0_list"], fixed_inputs["M0"], fixed_inputs["sens"], fixed_inputs["t_B1"], fixed_inputs["pos"], target_z, target_xy), device
+    )
+
+    if pre_train_inputs:
+        B1, G, fixed_inputs, _ = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
+        model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr={"pulse": 1e-4, "gradient": 2e-4}, thr=1e-5, device=device)
+
+    infoscreen = InfoScreen(output_every=plot_loss_freq)
+    trainLogger = TrainLogger(fixed_inputs, flip_angle, loss_metric, {"target_z": target_z, "target_xy": target_xy}, model_args, scanner_params, loss_weights, start_logging=start_logging)
+    for epoch in range(start_epoch, epochs + 1):
+        pulse, gradient = model(t_B1)
+        mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=fixed_inputs["dt"])
+        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+            mz, mxy, target_z, target_xy, pulse, gradient, 1000 * fixed_inputs["dt"], scanner_params=scanner_params, loss_weights=loss_weights, metric=loss_metric, verbose=True
+        )
+        loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
+
+        lossItem = loss.item()
+        losses.append(lossItem)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        scheduler.step(lossItem)
+
+        new_optimum = trainLogger.log_epoch(epoch, loss, losses, model, optimizer, pulse, gradient)
+        infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
+        infoscreen.print_info(epoch, lossItem, optimizer)

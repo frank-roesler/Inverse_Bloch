@@ -3,10 +3,12 @@ import numpy as np
 
 
 # TRAINING PARAMETERS:
+start_epoch = 0
 epochs = 10000
+resume_from_path = "results/train_log.pt"
 lr = {"pulse": 2e-4, "gradient": 1e-4}  # learning rate
-plot_loss_frequency = 10  # plot every n steps
-start_logging = 1000  # start logging after n steps
+plot_loss_frequency = 1  # plot every n steps
+start_logging = 200  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 suppress_loss_peaks = True
 loss_metric = "L2"
@@ -21,10 +23,10 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 2
+n_slices = 1
 n_b0_values = 1
 flip_angle = 17 / 45 * np.pi
-(pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs, freq_offsets_Hz, B0_list, gamma, gamma_hz_mt) = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
+fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -40,8 +42,8 @@ model_args = {
     "frequency_scale": 100.0,  # FourierMLP
     "gradient_scale": 10.0,  # relative size of gradient to RF pulse
     "positive_gradient": False,
-    "tmin": t_B1[0].item(),
-    "tmax": t_B1[-1].item(),
+    "tmin": fixed_inputs["t_B1"][0].item(),
+    "tmax": fixed_inputs["t_B1"][-1].item(),
 }
 
 # PARAMETERS OF THE SCANNER:

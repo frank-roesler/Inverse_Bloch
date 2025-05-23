@@ -2,9 +2,10 @@ from utils_bloch.blochsim_freqprof import *
 import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
 from utils_train.utils import torch_unwrap, move_to
+import os
 
 
-def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
+def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz, path=None):
     from params import flip_angle
 
     npts = len(freq_offsets_Hz)
@@ -64,10 +65,12 @@ def plot_off_resonance(rf, grad, pos, sens, dt, B0, M0, freq_offsets_Hz):
 
     # Adjust layout and show the plot
     plt.tight_layout()
+    if path is not None:
+        fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
     plt.show()
 
 
-def plot_some_b0_values(n_values, pos, sens, G, B1, B0, M0, target_xy, target_z, t_B1, dt):
+def plot_some_b0_values(n_values, pos, sens, G, B1, B0, M0, target_xy, target_z, t_B1, dt, slice_centers, half_width, path=None):
     from params import gamma_hz_mt
 
     freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_values)
@@ -97,10 +100,19 @@ def plot_some_b0_values(n_values, pos, sens, G, B1, B0, M0, target_xy, target_z,
         phase = np.unwrap(np.angle(mxy[ff, :]))
         phasemin = np.min(phase)
         phasemax = np.max(phase)
+
+        phase_means = []
+        for i, c in enumerate(slice_centers):
+            phase_mean_slice = np.mean(phase[c - half_width : c + half_width])
+            phase_means.append(phase_mean_slice)
+            print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
+        print("Difference:", f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ", f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees")
+
         phase[target_xy < 0.5] = np.nan
         ax_phase = ax[1, 1].twinx()
         ax_phase.set_ylabel("Phase (radians)")
         ax_phase.set_ylim(phasemin, phasemax)
         ax_phase.plot(pos[:, 2], phase, linewidth=0.8, color="g")
-        # plt.savefig("forward.png", dpi=300)
+        if path is not None:
+            fig.savefig(os.path.join(os.path.dirname(path), f"B0_{ff}.png"), dpi=300)
         plt.show()
