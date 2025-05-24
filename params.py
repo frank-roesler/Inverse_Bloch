@@ -5,7 +5,7 @@ import numpy as np
 # TRAINING PARAMETERS:
 start_epoch = 0
 epochs = 10000
-resume_from_path = r"C:\Users\frank\Dropbox\160525_Mixed_smooth_1Slice\train_log.pt"
+resume_from_path = r"results\train_log.pt"
 lr = {"pulse": 2e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 200  # start logging after n steps

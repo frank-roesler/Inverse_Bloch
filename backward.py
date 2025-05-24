@@ -26,9 +26,12 @@ if resume_from_path != None:
         scanner_params,
         loss_weights,
         start_epoch,
-    ) = load_data_legacy(resume_from_path, mode="train")
-    for param_group in optimizer.param_groups:
-        param_group["lr"] *= 0.5
+    ) = load_data_new(resume_from_path, mode="train")
+    loss_weights["phase_loss"] = 0.001
+    loss_weights["pulse_height_loss"] = 10.0
+    epochs = 30000
+    # for param_group in optimizer.param_groups:
+    #     param_group["lr"] *= 0.1
 
 
 train(
