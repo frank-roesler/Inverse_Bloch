@@ -4,13 +4,13 @@ import numpy as np
 
 # TRAINING PARAMETERS:
 start_epoch = 0
-epochs = 10000
-resume_from_path = r"/Users/frankrosler/Library/CloudStorage/Dropbox/train_log.pt"
+epochs = 20000
+resume_from_path = None
 lr = {"pulse": 2e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 200  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
-suppress_loss_peaks = True
+suppress_loss_peaks = False  # detect peaks in loss function and reduce lr
 loss_metric = "L2"
 loss_weights = {
     "loss_mxy": 1.0,
@@ -23,9 +23,9 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 2
-n_b0_values = 1
-flip_angle = 17 / 45 * np.pi
+n_slices = 1
+n_b0_values = 3
+flip_angle = 0.5 * np.pi
 fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
@@ -51,5 +51,5 @@ model_args = {
 scanner_params = {
     "max_gradient": 50,  # mT/m
     "max_diff_gradient": 200,  # mT/m/ms
-    "max_pulse_amplitude": 0.023,  # mT
+    "max_pulse_amplitude": 0.01,  # mT
 }

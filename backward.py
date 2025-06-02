@@ -8,27 +8,14 @@ device = get_device()
 target_z, target_xy, _, _ = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
 
 model = get_model(modelname, **model_args)
-if suppress_loss_peaks:
-    model_old = get_model(modelname, **model_args)
 
 model, optimizer, scheduler, losses = init_training(model, lr, device=device)
 if resume_from_path != None:
     pre_train_inputs = False
-    (
-        model,
-        target_z,
-        target_xy,
-        optimizer,
-        losses,
-        fixed_inputs,
-        flip_angle,
-        loss_metric,
-        scanner_params,
-        loss_weights,
-        start_epoch,
-    ) = load_data_legacy(resume_from_path, mode="train")
-    for param_group in optimizer.param_groups:
-        param_group["lr"] *= 0.5
+    (model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, start_epoch) = load_data(resume_from_path, mode="train")
+    # start_epoch, losses, model, optimizer, _, _, _, _, fixed_inputs = load_data_old(resume_from_path)
+    # for param_group in optimizer.param_groups:
+    #     param_group["lr"] *= 0.1
 
 
 train(
@@ -49,4 +36,5 @@ train(
     start_logging,
     plot_loss_frequency,
     pre_train_inputs,
+    suppress_loss_peaks,
 )

@@ -92,9 +92,12 @@ def time_loop_complex(
     Nb: int,
     Ns: int,
     device: torch.device,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     statea = torch.ones((Nb, Ns), dtype=torch.complex64, device=device)
     stateb = torch.zeros((Nb, Ns), dtype=torch.complex64, device=device)
+    tmpa = torch.zeros((Nb, Ns), dtype=torch.complex64, device=device)
+    alpha_t = torch.zeros((Nb, Ns), dtype=torch.complex64, device=device)
+    beta_t = torch.zeros((Nb, Ns), dtype=torch.complex64, device=device)
 
     for tt in range(alpha.shape[-1]):
         alpha_t = alpha[:, :, tt]
@@ -119,6 +122,13 @@ def time_loop_real(
     reStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
     imStatea = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
     imStateb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    reAlpha_t = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imAlpha_t = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    reBeta_t = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imBeta_t = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    retmpa = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    imtmpa = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
+    retmpb = torch.zeros((Nb, Ns), dtype=torch.float32, device=device)
     for tt in range(reAlpha.shape[-1]):
         reAlpha_t = reAlpha[:, :, tt]
         imAlpha_t = imAlpha[:, :, tt]

@@ -3,7 +3,7 @@ import torch
 from utils_bloch.simulation_utils import *
 
 
-def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
+def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6, time_loop="complex"):
     """
     Batch version of Bloch Simulator using Cayley-Klein parameters for multiple voxels simultaneously.
 
@@ -35,18 +35,21 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
 
     alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
 
-    # Loop over time
-    reStatea, imStatea, reStateb, imStateb = time_loop_real(
-        torch.real(alpha),
-        torch.real(beta),
-        torch.imag(alpha),
-        torch.imag(beta),
-        Nb,
-        Ns,
-        B1.device,
-    )
-    statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
-    stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
+    if time_loop == "real":
+        reStatea, imStatea, reStateb, imStateb = time_loop_real(
+            torch.real(alpha),
+            torch.real(beta),
+            torch.imag(alpha),
+            torch.imag(beta),
+            Nb,
+            Ns,
+            B1.device,
+        )
+        statea, stateb = reStatea + 1j * imStatea, reStateb + 1j * imStateb
+        stateaBar, statebBar = reStatea - 1j * imStatea, reStateb - 1j * imStateb
+    else:
+        statea, stateb = time_loop_complex(alpha, beta, Nb, Ns, alpha.device)
+        stateaBar, statebBar = torch.conj(statea), torch.conj(stateb)
 
     # Calculate final magnetization state (M0 can be 3x1 or 3xNs)
     if M0.ndim == 1:
