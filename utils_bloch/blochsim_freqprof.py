@@ -5,7 +5,10 @@ from utils_bloch.simulation_utils import time_loop_complex, compute_alpha_beta
 
 
 def blochsim_CK_freqprof(B1, G, pos, sens, B0, M0=np.array([0, 0, 1]), dt=6.4e-6, freq_offsets_Hz=np.array([0]), **kwargs):
-    from params import gamma, gamma_hz_mt
+    from params import fixed_inputs
+
+    gamma = fixed_inputs["gam"]
+    gamma_hz_mt = fixed_inputs["gam_hz_mt"]
 
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
     Ns = pos.shape[0]

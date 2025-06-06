@@ -28,10 +28,11 @@ if resume_from_path != None:
         start_epoch,
     ) = load_data_new(resume_from_path, mode="train")
     loss_weights["phase_loss"] = 0.001
-    loss_weights["pulse_height_loss"] = 10.0
-    epochs = 30000
+    loss_weights["pulse_height_loss"] = 1.0
+    epochs = 50000
+    target_z, target_xy, _, _ = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=n_slices)
     # for param_group in optimizer.param_groups:
-    #     param_group["lr"] *= 0.1
+    #     param_group["lr"] *= 0.01
 
 
 train(
