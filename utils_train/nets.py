@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.init as init
+from math import sqrt
 
 
 def get_model(model_name, **kwargs):
@@ -23,7 +24,7 @@ def get_model(model_name, **kwargs):
 class PulseGradientBase(nn.Module):
     def __init__(self, gradient_scale, positive_gradient=True, tmin=None, tmax=None, output_dim=3, **kwargs):
         super(PulseGradientBase, self).__init__()
-        self.gradient_scale = gradient_scale
+        self.gradient_scale = sqrt(gradient_scale)
         self.positive_gradient = positive_gradient
         self.tmin = tmin
         self.tmax = tmax
@@ -35,7 +36,7 @@ class PulseGradientBase(nn.Module):
             return model_output
         out_sign = nn.Softplus() if self.positive_gradient else nn.Identity()
         pulse = model_output[:, 0:1] + 1j * model_output[:, 1:2]
-        gradient = self.gradient_scale * out_sign(model_output[:, 2:])
+        gradient = self.gradient_scale * out_sign(self.gradient_scale * model_output[:, 2:])
         if self.tmin is None or self.tmax is None:
             return pulse, gradient
         bdry_scaling = (x - self.tmin) * (self.tmax - x)
@@ -72,7 +73,7 @@ class FourierPulse(nn.Module):
         super().__init__()
         self.tpulse = t_max - t_min
         p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
-        weights = torch.exp(-0.1 * torch.arange(-n_coeffs, n_coeffs + 1) ** 2)
+        weights = torch.exp(-0.01 * torch.arange(-n_coeffs, n_coeffs + 1) ** 2)
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
         self.k = torch.arange(-n_coeffs, n_coeffs + 1, requires_grad=False).unsqueeze(0)
@@ -138,7 +139,7 @@ class SIREN(PulseGradientBase):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
         init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
-        init.uniform_(self.final_layer.bias, a=-initial_weight_bound, b=initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=initial_weight_bound, b=2 * initial_weight_bound)
 
     def forward(self, x):
         x_orig = x.clone()
@@ -162,9 +163,7 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
-    ):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]

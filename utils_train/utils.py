@@ -43,11 +43,11 @@ class TrainLogger:
         return self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if epoch <= self.start_logging:
-            return False
         if not losses[-1] < 0.99 * self.best_loss:
             return False
         self.best_loss = losses[-1]
+        if epoch <= self.start_logging:
+            return False
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(self.log, filename)
         self.export_json()
@@ -201,11 +201,12 @@ class InfoScreen:
         line_collection = LineCollection(line_list, linewidths=0.7, colors=colors, linestyle=linestyle)
         ax.add_collection(line_collection)
 
-    def print_info(self, epoch, loss, optimizer):
+    def print_info(self, epoch, loss, optimizer, best_loss):
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
         print(f"Loss: {loss:.5f}")
+        print(f"Best Loss: {best_loss:.5f}")
         for i, param_group in enumerate(optimizer.param_groups):
             print(f"Learning rate {i}: {param_group['lr']:.6f}")
         print(f"Time: {self.t1:.1f}")
@@ -291,6 +292,7 @@ def threshold_loss(x, threshold):
 
 
 def loss_fn(
+    posAx,
     z_profile,
     xy_profile,
     target_z,
@@ -305,25 +307,30 @@ def loss_fn(
 ):
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
-        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).sum(dim=0)
-        loss_mz = torch.mean((z_profile - target_z) ** 2).sum(dim=0)
+        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).mean(dim=0)
+        loss_mz = torch.mean((z_profile - target_z) ** 2).mean(dim=0)
     elif metric == "L1":
-        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).sum(dim=0)
-        loss_mz = torch.mean(torch.abs(z_profile - target_z)).sum(dim=0)
+        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).mean(dim=0)
+        loss_mz = torch.mean(torch.abs(z_profile - target_z)).mean(dim=0)
     else:
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
-    boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).sum(dim=0)
-    gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).sum(dim=0)
-    pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).sum(dim=0)
+    boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).mean(dim=0)
+    gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).mean(dim=0)
+    pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).mean(dim=0)
     if gradient.shape[0] > 1:
-        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).sum(dim=0)
+        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).mean(dim=0)
     else:
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
-    phase_diff = torch.diff(torch_unwrap(torch.angle(xy_profile)))
+    phase = torch_unwrap(torch.angle(xy_profile))
+    phase_diff = torch.diff(phase)
     phase_ddiff = torch.diff(phase_diff)
-    phase_ddiff = phase_ddiff[:, target_xy[1:-1] > 1e-6]
-    phase_diff_var = torch.var(phase_diff[:, target_xy[:-1] > 1e-6])
-    phase_loss = (torch.mean(phase_ddiff**2) + phase_diff_var).sum(dim=0)
+    where_peaks_are = target_xy > 1e-6
+    phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
+    phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
+    # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
+    # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
+    phase_loss = (phase_ddiff + phase_diff_var).mean(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -335,6 +342,9 @@ def loss_fn(
         print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
         print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
+        print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
+        print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
+        # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
     return (
         loss_weights["loss_mxy"] * loss_mxy,
@@ -414,19 +424,33 @@ def load_data_legacy(path, mode="inference"):
 
 
 def load_data_old(path):
+    import params
+
     data_dict = torch.load(path, weights_only=False, map_location="cpu")
-    # epoch = data_dict["epoch"]
-    # L2_loss = data_dict["L2_loss"]
-    # D_loss = data_dict["D_loss"]
-    # losses = data_dict["losses"]
-    # model = data_dict["model"]
-    # optimizer = data_dict["optimizer"]
-    inputs = data_dict["inputs"]
+    epoch = data_dict["epoch"]
+    losses = data_dict["losses"]
+    model = data_dict["model"]
+    optimizer = data_dict["optimizer"]
+    (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
     pulse = data_dict["pulse"].detach().cpu()
     gradient = data_dict["gradient"].detach().cpu()
-    return pulse, gradient, target_z, target_xy, inputs["pos"], inputs["dt"]
+
+    fixed_inputs = params.fixed_inputs
+
+    fixed_inputs["pos"] = pos
+    fixed_inputs["dt"] = dt
+    fixed_inputs["dx"] = dx
+    fixed_inputs["Nz"] = Nz
+    fixed_inputs["sens"] = sens
+    fixed_inputs["B0"] = B0
+    fixed_inputs["tAx"] = tAx
+    fixed_inputs["fAx"] = fAx
+    fixed_inputs["t_B1"] = t_B1
+    fixed_inputs["M0"] = M0
+    fixed_inputs["inputs"] = inputs
+    return epoch, losses, model, optimizer, pulse, gradient, target_z, target_xy, fixed_inputs
 
 
 def torch_unwrap(phase, discont=torch.pi):
@@ -483,6 +507,7 @@ def train(
     start_logging,
     plot_loss_freq,
     pre_train_inputs=False,
+    suppress_loss_peaks=False,
 ):
     B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy, model = move_to(
         (
@@ -521,14 +546,24 @@ def train(
     for epoch in range(start_epoch, epochs + 1):
         pulse, gradient = model(t_B1)
 
-        shift = 0.65
-        exponent = 1j * torch.cumsum(gradient, dim=0) * fixed_inputs["dt"] * 1e3 * 2 * torch.pi * shift
-        B1_left = pulse * torch.exp(-exponent)
-        B1_right = pulse * torch.exp(exponent)
-        pulse = B1_left + B1_right
+        # shift = 0.0025
+        # exponent = 1j * torch.cumsum(gradient, dim=0) * fixed_inputs["dt"] * 2 * torch.pi * shift * fixed_inputs["gam"]
+        # pulse_left = pulse * torch.exp(-exponent)
+        # pulse_right = pulse * torch.exp(exponent)
+        # pulse = pulse_left + pulse_right
 
-        mxy, mz = blochsim_CK_batch(B1=pulse, G=gradient, pos=pos, sens=sens, B0_list=B0_list, M0=M0, dt=fixed_inputs["dt"])
+        mxy, mz = blochsim_CK_batch(
+            B1=pulse,
+            G=gradient,
+            pos=pos,
+            sens=sens,
+            B0_list=B0_list,
+            M0=M0,
+            dt=fixed_inputs["dt"],
+            time_loop="real",
+        )
         (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+            fixed_inputs["pos"][:, 2],
             mz,
             mxy,
             target_z,
@@ -547,9 +582,18 @@ def train(
         losses.append(lossItem)
         optimizer.zero_grad()
         loss.backward()
+        if suppress_loss_peaks:
+            model = regularize_model_gradients(model)
+            # if epoch > 1 and losses[-1] > 2 * trainLogger.best_loss:
+            #     model.load_state_dict(model_old.state_dict())
+            #     for param_group in optimizer.param_groups:
+            #         param_group["lr"] *= 0.5
+            #     print("EXPLOSION!!! MODEL RESETTED")
+            # else:
+            #     model_old.load_state_dict(model.state_dict())
         optimizer.step()
         scheduler.step(lossItem)
 
         new_optimum = trainLogger.log_epoch(epoch, loss, losses, model, optimizer, pulse, gradient)
         infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
-        infoscreen.print_info(epoch, lossItem, optimizer)
+        infoscreen.print_info(epoch, lossItem, optimizer, trainLogger.best_loss)
