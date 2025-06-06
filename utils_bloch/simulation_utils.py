@@ -86,6 +86,7 @@ def time_loop_complex_timeprof(
     return (statea, stateb)
 
 
+@torch.compile
 def time_loop_complex(
     alpha: torch.Tensor,
     beta: torch.Tensor,
@@ -108,7 +109,7 @@ def time_loop_complex(
     return (statea, stateb)
 
 
-@torch.jit.script
+@torch.compile
 def time_loop_real(
     reAlpha: torch.Tensor,
     reBeta: torch.Tensor,

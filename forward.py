@@ -19,10 +19,10 @@ B1, G, target_z, target_xy, fixed_inputs = load_data(path)
 print("PULS AMPLITUDE:", torch.max(torch.abs(B1)).item())
 
 npts_off_resonance = 128
-npts_some_b0_values = 3
+npts_some_b0_values = 7
 
 freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
 with torch.no_grad():
-    plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, path=path)
-    plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=path)
+    # plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, path=path)
+    # plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=path)
     plot_timeprof(fixed_inputs, B1, G, fixed_inputs, slice_centers, path=path)

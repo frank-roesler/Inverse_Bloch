@@ -560,7 +560,7 @@ def train(
             B0_list=B0_list,
             M0=M0,
             dt=fixed_inputs["dt"],
-            time_loop="complex",
+            time_loop="real",
         )
         (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
             fixed_inputs["pos"][:, 2],
