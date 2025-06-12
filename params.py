@@ -5,33 +5,33 @@ import numpy as np
 # TRAINING PARAMETERS:
 start_epoch = 0
 epochs = 20000
-resume_from_path = "results/040625_Mixed_1Slice/train_log.pt"
-lr = {"pulse": 5e-5, "gradient": 5e-5}  # learning rate
+resume_from_path = "results/train_log.pt"  # path to resume training from
+lr = {"pulse": 1e-4, "gradient": 1e-4}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
-start_logging = 100  # start logging after n steps
+start_logging = 50  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
-suppress_loss_peaks = False  # detect peaks in loss function and reduce lr
+suppress_loss_peaks = True  # detect peaks in loss function and reduce lr
 loss_metric = "L2"
 loss_weights = {
     "loss_mxy": 1.0,
     "loss_mz": 1.0,
-    "boundary_vals_pulse": 100.0,
+    "boundary_vals_pulse": 1000.0,
     "gradient_height_loss": 0.1,
-    "pulse_height_loss": 100.0,
+    "pulse_height_loss": 1000.0,
     "gradient_diff_loss": 1.0,
-    "phase_loss": 10.0,
+    "phase_loss": 1.0,
 }
 
 # BLOCH PARAMETERS:
 n_slices = 1
-n_b0_values = 1
+n_b0_values = 3
 flip_angle = 0.5 * np.pi
 fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
 model_args = {
-    "n_coeffs": 30,  # Fourier Series
+    "n_coeffs": 40,  # Fourier Series
     "omega_0": 45,  # SIREN
     "bandwidth": 101,  # ModulatedFourier
     "hidden_dim": 32,  # MLP, SIREN, ModulatedFourier
@@ -51,5 +51,5 @@ model_args = {
 scanner_params = {
     "max_gradient": 50,  # mT/m
     "max_diff_gradient": 200,  # mT/m/ms
-    "max_pulse_amplitude": 0.015,  # mT
+    "max_pulse_amplitude": 0.02,  # mT
 }

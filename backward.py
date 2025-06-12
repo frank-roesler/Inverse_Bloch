@@ -17,8 +17,9 @@ if resume_from_path != None:
     )
     # start_epoch, losses, model, optimizer, _, _, _, _, fixed_inputs = load_data_old(resume_from_path)
     for param_group in optimizer.param_groups:
-        param_group["lr"] *= 0.5
-    loss_weights["phase_loss"] *= 0.1
+        param_group["lr"] *= 10
+    loss_metric = "L1"
+    loss_weights["phase_loss"] = 100.0
 
 train(
     model,

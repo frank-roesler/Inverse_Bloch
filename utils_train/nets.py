@@ -139,7 +139,7 @@ class SIREN(PulseGradientBase):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
         init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
-        init.uniform_(self.final_layer.bias, a=initial_weight_bound, b=2 * initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=initial_weight_bound, b=1.1 * initial_weight_bound)
 
     def forward(self, x):
         x_orig = x.clone()
@@ -163,7 +163,9 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
+    def __init__(
+        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
+    ):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]

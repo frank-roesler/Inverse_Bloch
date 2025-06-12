@@ -1,19 +1,27 @@
 from utils_bloch.blochsim_freqprof import *
 import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
-from utils_train.utils import torch_unwrap, move_to
 import os
 
 
-def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None):
+def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block=False):
     from params import flip_angle
 
     npts = len(freq_offsets_Hz)
+    pos = fixed_inputs["pos"].detach().cpu()
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(
-        rf, grad, pos=fixed_inputs["pos"], sens=fixed_inputs["sens"], B0=fixed_inputs["B0"], M0=fixed_inputs["M0"], dt=fixed_inputs["dt"], freq_offsets_Hz=freq_offsets_Hz
+        rf.detach().cpu(),
+        grad.detach().cpu(),
+        pos=pos,
+        sens=fixed_inputs["sens"].detach().cpu(),
+        B0=fixed_inputs["B0"].detach().cpu(),
+        M0=fixed_inputs["M0"].detach().cpu(),
+        dt=fixed_inputs["dt"],
+        freq_offsets_Hz=freq_offsets_Hz,
     )
 
-    (mxy_profile, mz_profile, pos) = move_to((mxy_profile, mz_profile, fixed_inputs["pos"]), torch.device("cpu"))
+    mxy_profile = mxy_profile.detach().cpu()
+    mz_profile = mz_profile.detach().cpu()
 
     fig, axes = plt.subplots(1, 3, figsize=(14.5, 4))
     img_extent = [
@@ -69,11 +77,11 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None):
     plt.tight_layout()
     if path is not None:
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
-    plt.show()
 
 
 def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=None):
     from params import fixed_inputs
+    from utils_train.utils import move_to
 
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
@@ -103,15 +111,24 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         ax[1, 1].plot(pos[:, 2], target_xy, linewidth=0.8)
 
         phase = np.unwrap(np.angle(mxy[ff, :]))
-        phasemin = np.min(phase)
-        phasemax = np.max(phase)
+        phasemin = np.inf
+        phasemax = -np.inf
 
         phase_means = []
         for i, c in enumerate(slice_centers):
-            phase_mean_slice = np.mean(phase[c - half_width : c + half_width])
+            phase_loc = phase[c - half_width : c + half_width]
+            phasemin = np.min([phasemin, np.min(phase_loc)])
+            phasemax = np.max([phasemax, np.max(phase_loc)])
+            phase_mean_slice = np.mean(phase_loc)
             phase_means.append(phase_mean_slice)
             print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-        print("Difference:", f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ", f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees")
+        print(
+            "Difference:",
+            f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
+            f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
+        )
+        phasemin -= 0.5 * np.abs(phasemax - phasemin)
+        phasemax += 0.5 * np.abs(phasemax - phasemin)
 
         phase[target_xy < 0.5] = np.nan
         ax_phase = ax[1, 1].twinx()
@@ -120,4 +137,3 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         ax_phase.plot(pos[:, 2], phase, linewidth=0.8, color="g")
         if path is not None:
             fig.savefig(os.path.join(os.path.dirname(path), f"B0_{ff}.png"), dpi=300)
-        plt.show()

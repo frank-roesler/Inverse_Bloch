@@ -5,11 +5,12 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import torch
 import numpy as np
-from params import model_args
+from params import model_args, fixed_inputs
 import os
 import datetime
 import json
 from utils_bloch import blochsim_CK_batch, blochsim_CK_batch_realPulse
+from utils_infer import plot_off_resonance
 
 
 class TrainLogger:
@@ -123,9 +124,14 @@ class InfoScreen:
         self.ax[0].legend()
         self.ax[1].legend()
         self.ax[2].legend()
+        plt.show(block=False)
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
+        # if epoch % 1000 == 0 and epoch > 0:
+        #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
+        #     plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
+
         if epoch % self.output_every == 0 or export_figure:
             pos = pos.cpu()[:, 2]
             fmin = -0.09  # torch.min(pos).item()
@@ -183,13 +189,13 @@ class InfoScreen:
             self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
-            self.fig.canvas.draw()
+            self.fig.canvas.draw_idle()
             if export_figure:
                 filename = "results/training.png"
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 plt.savefig(filename, dpi=300)
-            plt.show(block=False)
-            plt.pause(0.001)
+            plt.pause(0.05)
+            self.fig.canvas.flush_events()
 
     def add_line_collection(self, ax, xdata, ydata, linestyle="solid"):
         line_list = [list(zip(xdata, ydata[b, :])) for b in range(ydata.shape[0])]
@@ -205,10 +211,10 @@ class InfoScreen:
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"Loss: {loss:.5f}")
-        print(f"Best Loss: {best_loss:.5f}")
+        print(f"Loss: {loss:.6f}")
+        print(f"Best Loss: {best_loss:.6f}")
         for i, param_group in enumerate(optimizer.param_groups):
-            print(f"Learning rate {i}: {param_group['lr']:.6f}")
+            print(f"Learning rate {i}: {param_group['lr']:.7f}")
         print(f"Time: {self.t1:.1f}")
         print("-" * 100)
 
@@ -280,7 +286,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=20, min_lr=2e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -357,18 +363,18 @@ def loss_fn(
     )
 
 
-def load_data(path, mode="inference"):
+def load_data(path, mode="inference", device="cpu"):
     creation_time = os.path.getctime(path)
     creation_datetime = datetime.datetime.fromtimestamp(creation_time)
     refactor_date = datetime.datetime(2025, 5, 23)
     if creation_datetime < refactor_date:
         return load_data_legacy(path, mode=mode)
     else:
-        return load_data_new(path, mode=mode)
+        return load_data_new(path, mode=mode, device=device)
 
 
-def load_data_new(path, mode="inference"):
-    data_dict = torch.load(path, weights_only=False, map_location="cpu")
+def load_data_new(path, mode="inference", device="cpu"):
+    data_dict = torch.load(path, weights_only=False, map_location=device)
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
     epoch = data_dict["epoch"]
@@ -544,6 +550,8 @@ def train(
         start_logging=start_logging,
     )
     for epoch in range(start_epoch, epochs + 1):
+        # if epoch % 1000 == 0 and epoch > 0:
+        #     loss_weights["phase_loss"] *= 0.1
         pulse, gradient = model(t_B1)
 
         # shift = 0.0025
@@ -560,7 +568,7 @@ def train(
             B0_list=B0_list,
             M0=M0,
             dt=fixed_inputs["dt"],
-            time_loop="real",
+            time_loop="complex",
         )
         (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
             fixed_inputs["pos"][:, 2],
@@ -583,14 +591,15 @@ def train(
         optimizer.zero_grad()
         loss.backward()
         if suppress_loss_peaks:
-            model = regularize_model_gradients(model)
-            # if epoch > 1 and losses[-1] > 2 * trainLogger.best_loss:
-            #     model.load_state_dict(model_old.state_dict())
-            #     for param_group in optimizer.param_groups:
-            #         param_group["lr"] *= 0.5
-            #     print("EXPLOSION!!! MODEL RESETTED")
-            # else:
-            #     model_old.load_state_dict(model.state_dict())
+            # model = regularize_model_gradients(model)
+            if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
+                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
+                    "results/train_log.pt", mode="train", device=device
+                )
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] *= 0.2
+                print("Loss peak detected, reloading model and reducing learning rate.")
+                continue
         optimizer.step()
         scheduler.step(lossItem)
 
