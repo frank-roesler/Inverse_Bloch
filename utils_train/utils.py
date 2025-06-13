@@ -128,9 +128,10 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
-        # if epoch % 1000 == 0 and epoch > 0:
-        #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
-        #     plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
+        if epoch % 1000 == 0 and epoch > 0:
+            freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
+            plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
+            plt.show(block=False)
 
         if epoch % self.output_every == 0 or export_figure:
             pos = pos.cpu()[:, 2]
@@ -146,9 +147,12 @@ class InfoScreen:
             pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()), axis=-1)
-            phasemin = np.min(phase)
-            phasemax = np.max(phase)
-            phase[:, tgt_xy < 0.5] = np.nan
+            where_slices_are = tgt_xy > 0.5
+            phasemin = np.min(phase[:, where_slices_are])
+            phasemax = np.max(phase[:, where_slices_are])
+            phasemin = phasemin - 0.5 * (phasemax - phasemin)
+            phasemax = phasemax + 0.5 * (phasemax - phasemin)
+            phase[:, ~where_slices_are] = np.nan
 
             for collection in self.ax_bottom_left.collections:
                 collection.remove()
@@ -233,13 +237,11 @@ def move_to(tensor_list, device=torch.device("cpu")):
     return out_list
 
 
-def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=torch.device("cpu")):
-    import params
-
+def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1e-3, device=torch.device("cpu")):
     target_pulse = target_pulse.to(device)
     target_gradient = target_gradient.to(device)
     model, optimizer, scheduler, _ = init_training(model, lr=lr, device=device)
-    t_B1 = params.t_B1.to(device)
+    t_B1 = fixed_inputs["t_B1"].to(device)
     loss = torch.inf
     epoch = 0
     while loss > thr:
@@ -253,7 +255,7 @@ def pre_train(target_pulse, target_gradient, model, lr=1e-4, thr=1e-3, device=to
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        # scheduler.step(loss.item())
+        scheduler.step(loss.item())
         if epoch % 1000 == 0:
             print(f"Epoch: {epoch}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
     # plt.figure()
@@ -286,7 +288,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=2e-6)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=1e-7)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -333,10 +335,11 @@ def loss_fn(
     where_peaks_are = target_xy > 1e-6
     phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
     phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
     # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
     # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
     # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
-    phase_loss = (phase_ddiff + phase_diff_var).mean(dim=0)
+    phase_loss = (phase_ddiff + phase_diff_var + phase_diff_loss).mean(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -350,6 +353,7 @@ def loss_fn(
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
         print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
         print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
+        print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
         # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
     return (
@@ -535,8 +539,16 @@ def train(
                 state[k] = v.to(device)
 
     if pre_train_inputs:
-        B1, G, fixed_inputs, _ = load_data("C:/Users/frank/Dropbox/090525_Mixed_4Slices/train_log.pt")
-        model = pre_train(target_pulse=B1, target_gradient=G, model=model, lr={"pulse": 1e-4, "gradient": 2e-4}, thr=1e-5, device=device)
+        (B1, G, _, _, fixed_inputs) = load_data("results/120625_Mixed_1Slice_90deg_L2/train_log.pt")
+        model = pre_train(
+            target_pulse=B1,
+            target_gradient=G,
+            model=model,
+            fixed_inputs=fixed_inputs,
+            lr={"pulse": 1e-2, "gradient": 1e-2},
+            thr=0.0027,
+            device=device,
+        )
 
     infoscreen = InfoScreen(output_every=plot_loss_freq)
     trainLogger = TrainLogger(
@@ -597,7 +609,7 @@ def train(
                     "results/train_log.pt", mode="train", device=device
                 )
                 for param_group in optimizer.param_groups:
-                    param_group["lr"] *= 0.2
+                    param_group["lr"] *= 0.1
                 print("Loss peak detected, reloading model and reducing learning rate.")
                 continue
         optimizer.step()

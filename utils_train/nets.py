@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import torch.nn.init as init
 from math import sqrt
+import torch.nn.functional as F
 
 
 def get_model(model_name, **kwargs):
@@ -15,6 +16,7 @@ def get_model(model_name, **kwargs):
         "MixedModel": MixedModel,
         "ModulatedFourier": ModulatedFourier,
         "MixedModel_RealPulse": MixedModel_RealPulse,
+        "NoModel": NoModel,
     }
     if model_name not in model_dict:
         raise ValueError(f"Model {model_name} is not supported.")
@@ -73,6 +75,7 @@ class FourierPulse(nn.Module):
         super().__init__()
         self.tpulse = t_max - t_min
         p = 1e-3 * torch.randn((2 * n_coeffs + 1, 2))
+        # p[:, 1] *= 1e-6
         weights = torch.exp(-0.01 * torch.arange(-n_coeffs, n_coeffs + 1) ** 2)
         p = p * weights.unsqueeze(1)
         self.params = torch.nn.Parameter(p)
@@ -139,7 +142,7 @@ class SIREN(PulseGradientBase):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
         init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
-        init.uniform_(self.final_layer.bias, a=initial_weight_bound, b=1.1 * initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=8 * initial_weight_bound, b=9 * initial_weight_bound)
 
     def forward(self, x):
         x_orig = x.clone()
@@ -221,4 +224,43 @@ class MixedModel_RealPulse(PulseGradientBase):
         pulse = self.pulse_model(x)
         gradient = self.gradient_scale * self.gradient_value
 
+        return pulse, gradient
+
+
+class NoModel(PulseGradientBase):
+    def __init__(self, input_dim=1, output_dim=3, tvector=torch.arange(0, 512) / 512 * 1.25, **kwargs):
+        super(NoModel, self).__init__(output_dim=output_dim, **kwargs)
+        self.name = "NoModel"
+        self.Nt = len(tvector)
+        p = 1e-3 * torch.randn(len(tvector), 3)
+
+        p = self.smooth_params(p)
+        p = self.smooth_params(p)
+        p = self.smooth_params(p)
+        p = self.smooth_params(p)
+
+        bdry_scaling = (
+            (tvector - self.tmin) * (self.tmax - tvector) / (self.tmax - self.tmin)
+            if self.tmin is not None and self.tmax is not None
+            else torch.ones_like(tvector)
+        )
+        p[:, 0:2] = p[:, 0:2] * bdry_scaling.unsqueeze(1)
+        p[:, 2] = sqrt(self.gradient_scale) * (100 * sqrt(self.gradient_scale) * p[:, 2] + 1)
+        self.params = torch.nn.Parameter(p)
+
+    def smooth_params(self, p):
+        smoothing_kernel_size = 10
+        pad = smoothing_kernel_size // 2
+        p_reshaped = p.T.unsqueeze(0)  # [1, 3, 512]
+        p_pad = torch.nn.functional.pad(p_reshaped, (pad, pad), mode="reflect")
+        p_smooth = torch.nn.functional.avg_pool1d(p_pad, kernel_size=smoothing_kernel_size, stride=1)
+        p_smooth = p_smooth.squeeze(0).T  # [513, 3]
+        p_smooth = p_smooth[: self.Nt]  # Slice to [512, 3]
+        norm = torch.norm(p, dim=1, keepdim=True).clamp(min=1e-8)
+        norm_smooth = torch.norm(p_smooth, dim=1, keepdim=True).clamp(min=1e-8)
+        return p_smooth * (norm / norm_smooth)
+
+    def forward(self, x):
+        pulse = self.params[:, 0:1] + 1j * self.params[:, 1:2]
+        gradient = self.params[:, 2:]
         return pulse, gradient
