@@ -4,7 +4,7 @@ from params import *
 from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_fit_error
 
 
-path = "results/train_log.pt"
+path = "/Users/frankrosler/Library/CloudStorage/Dropbox/120625_Mixed_90deg_phaseDiffLoss/train_log.pt"
 
 target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
 # _, _, _, _, B1, G, target_z, target_xy, fixed_inputs = load_data_old(path)
