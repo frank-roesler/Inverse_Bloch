@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from utils_bloch import blochsim_CK_batch
+import os
 
 
 def simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3):
@@ -44,16 +45,18 @@ def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
     return fitted_lines, phases
 
 
-def plot_fit_error(fixed_inputs, B1, G, centers, half_width):
+def plot_fit_error(fixed_inputs, B1, G, centers, half_width, path=None):
     fitted_lines, phases = fit_line_to_phase(fixed_inputs, B1, G, centers, half_width)
     where_slices_are = np.zeros_like(phases[0])
     for center in centers:
         where_slices_are[center - half_width : center + half_width] = 1
-    plt.figure(figsize=(10, 5))
+    fig, ax = plt.subplots(figsize=(10, 5))
     for i, fitted_line in enumerate(fitted_lines):
         error = phases[i] - fitted_line
         error[~where_slices_are.astype(bool)] = np.nan
-        plt.plot(fixed_inputs["pos"][:, 2], error, linewidth=0.8)
-    plt.title("Phase Fitting and Error")
-    plt.xlabel("pos")
-    plt.ylabel("Phase Value")
+        ax.plot(fixed_inputs["pos"][:, 2], error, linewidth=0.8)
+    ax.set_title("Phase Fitting and Error")
+    ax.set_xlabel("pos")
+    ax.set_ylabel("Phase minus linear fit")
+    if path is not None:
+        fig.savefig(os.path.join(os.path.dirname(path), f"phase_error.png"), dpi=300)

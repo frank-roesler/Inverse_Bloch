@@ -5,7 +5,7 @@ import numpy as np
 # TRAINING PARAMETERS:
 start_epoch = 0
 epochs = 20000
-resume_from_path = None  # "results/train_log.pt"  # path to resume training from
+resume_from_path = "results/train_log.pt"  # path to resume training from
 lr = {"pulse": 2e-5, "gradient": 2e-5}  # learning rate
 plot_loss_frequency = 10  # plot every n steps
 start_logging = 100  # start logging after n steps
@@ -19,14 +19,14 @@ loss_weights = {
     "gradient_height_loss": 0.1,
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
-    "phase_loss": 0.1,
+    "phase_loss": 100.0,
 }
 
 # BLOCH PARAMETERS:
 n_slices = 1
-n_b0_values = 3
+n_b0_values = 1
 flip_angle = 0.5 * np.pi
-fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
+fixed_inputs = get_fixed_inputs(tfactor=3.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -41,7 +41,7 @@ model_args = {
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
     "tvector": fixed_inputs["t_B1"][:, 0],  # NoModel
-    "gradient_scale": 3.0,  # relative size of gradient to RF pulse
+    "gradient_scale": 10.0,  # relative size of gradient to RF pulse
     "positive_gradient": False,
     "tmin": fixed_inputs["t_B1"][0].item(),
     "tmax": fixed_inputs["t_B1"][-1].item(),

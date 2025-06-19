@@ -331,15 +331,15 @@ def loss_fn(
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase = torch_unwrap(torch.angle(xy_profile))
     phase_diff = torch.diff(phase)
-    phase_ddiff = torch.diff(phase_diff)
+    # phase_ddiff = torch.diff(phase_diff)
     where_peaks_are = target_xy > 1e-6
-    phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
-    phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    # phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
+    # phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
     phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
     # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
     # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
     # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
-    phase_loss = (phase_ddiff + phase_diff_var + phase_diff_loss).mean(dim=0)
+    phase_loss = (0 + 0 + phase_diff_loss).mean(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -351,8 +351,8 @@ def loss_fn(
         print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
         print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
-        print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
-        print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
+        # print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
+        # print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
         print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
         # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)

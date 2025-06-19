@@ -21,13 +21,13 @@ target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_a
 
 print("PULS AMPLITUDE:", torch.max(torch.abs(B1)).item())
 
-npts_off_resonance = 32
+npts_off_resonance = 256
 npts_some_b0_values = 5
 
 freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
 with torch.no_grad():
-    # plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, path=path, block=True)
-    # plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=path)
-    # plot_timeprof(fixed_inputs, B1, G, fixed_inputs, slice_centers, path=path)
-    plot_fit_error(fixed_inputs, B1, G, slice_centers, half_width)
+    plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, path=path, block=True)
+    plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=path)
+    plot_timeprof(fixed_inputs, B1, G, fixed_inputs, slice_centers, path=path)
+    plot_fit_error(fixed_inputs, B1, G, slice_centers, half_width, path=path)
     plt.show()
