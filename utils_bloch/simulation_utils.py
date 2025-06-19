@@ -48,7 +48,6 @@ def cos_of_root(small_x):
 
 
 def compute_alpha_beta(bxy, bz, dt, gam):
-    dt *= 1e-3
     normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=bxy.device, requires_grad=False)
