@@ -19,14 +19,14 @@ def simulate_B0_values(fixed_inputs, B1, G, M0=fixed_inputs["M0"]):
         B0_list = [fixed_inputs["B0"] + B0_freq_offsets_mT]
 
         B0 = torch.stack(B0_list, dim=0).to(torch.float32)
-        mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=M0, dt=fixed_inputs["dt"])
+        mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=M0, dt=fixed_inputs["dt_num"])
     return mxy, mz
 
 
 B1, G, target_z, target_xy, fixed_inputs = load_data(path)
 
 shift = 0.0025
-exponent = 1j * torch.cumsum(G, dim=0) * fixed_inputs["dt"] * 2 * torch.pi * shift * fixed_inputs["gam"]
+exponent = 1j * torch.cumsum(G, dim=0) * fixed_inputs["dt_num"] * 2 * torch.pi * shift * fixed_inputs["gam"]
 B1_left = B1 * torch.exp(-exponent)
 B1_right = B1 * torch.exp(exponent)
 B1 = B1_left + B1_right
@@ -41,9 +41,9 @@ fig, (ax1, ax3) = plt.subplots(1, 2, figsize=(13, 5), sharex=True)
 
 # First plot
 ax2 = ax1.twinx()
-ax1.plot(fixed_inputs["pos"][:, 2], np.abs(mxy[0, :]), label="|mxy|")
-ax1.plot(fixed_inputs["pos"][:, 2], mz[0, :], label="mz")
-ax2.plot(fixed_inputs["pos"][:, 2], phase, "g--", label="phase", linewidth=0.8)
+ax1.plot(fixed_inputs["pos"], np.abs(mxy[0, :]), label="|mxy|")
+ax1.plot(fixed_inputs["pos"], mz[0, :], label="mz")
+ax2.plot(fixed_inputs["pos"], phase, "g--", label="phase", linewidth=0.8)
 ax1.set_ylabel("Magnitude")
 ax2.set_ylabel("Phase (rad)", color="g")
 ax1.set_xlim(-0.05, 0.05)
@@ -64,9 +64,9 @@ phasemax = np.max(phase[slices])
 
 # Second plot
 ax4 = ax3.twinx()
-ax3.plot(fixed_inputs["pos"][:, 2], np.abs(mxy_new[0, :]), label="|mxy_new|")
-ax3.plot(fixed_inputs["pos"][:, 2], mz_new[0, :], label="mz_new")
-ax4.plot(fixed_inputs["pos"][:, 2], phase, "g--", label="phase_new", linewidth=0.8)
+ax3.plot(fixed_inputs["pos"], np.abs(mxy_new[0, :]), label="|mxy_new|")
+ax3.plot(fixed_inputs["pos"], mz_new[0, :], label="mz_new")
+ax4.plot(fixed_inputs["pos"], phase, "g--", label="phase_new", linewidth=0.8)
 ax3.set_xlabel("Position (z)")
 ax3.set_ylabel("Magnitude")
 ax4.set_ylabel("Phase (rad)", color="g")

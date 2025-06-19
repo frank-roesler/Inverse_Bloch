@@ -5,13 +5,12 @@ import matplotlib.pyplot as plt
 import os
 
 
-def plot_timeprof(gamma, B1, G, fixed_inputs, slice_centers, path=None):
-    mxy, mz = blochsim_CK_timeprofile(
-        gamma, B1, G, fixed_inputs["pos"], fixed_inputs["sens"], fixed_inputs["B0_list"], fixed_inputs["M0"], fixed_inputs["dt"]
-    )
+def plot_timeprof(gamma, B1, G, fixed_inputs, slice_centers, path=None, fig=None, ax=None):
+    mxy, mz = blochsim_CK_timeprofile(gamma, B1, G, fixed_inputs["pos"], fixed_inputs["sens"], fixed_inputs["B0_list"], fixed_inputs["M0"], fixed_inputs["dt_num"])
     cmap = cm.get_cmap("inferno", len(slice_centers) + 2)
     colors = [cmap(i + 1) for i in range(len(slice_centers))]
-    fig, ax = plt.subplots(figsize=(12, 6))
+    if ax == None or fig == None:
+        fig, ax = plt.subplots(figsize=(12, 6))
     for i, c in enumerate(slice_centers):
         color = colors[i]
         timeprof = torch.abs(mxy[0, c, :])
@@ -20,9 +19,7 @@ def plot_timeprof(gamma, B1, G, fixed_inputs, slice_centers, path=None):
         com = timeprof[-1] - torch.sum(timeprof)
         com = int(com.item())
 
-        ax.plot(
-            fixed_inputs["t_B1"], timeprof, linewidth=0.9, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color
-        )
+        ax.plot(fixed_inputs["t_B1"], timeprof, linewidth=0.9, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color)
         # plt.plot(fixed_inputs['t_B1_centers'], timeprof_diff, linewidth=0.8, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color)
         ax.plot(fixed_inputs["t_B1"][com], timeprof[com], "o", color=color)
     plt.legend()

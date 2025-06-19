@@ -134,7 +134,7 @@ class InfoScreen:
             plt.show(block=False)
 
         if epoch % self.output_every == 0 or export_figure:
-            pos = pos.cpu()[:, 2]
+            pos = pos.cpu()
             fmin = -0.09  # torch.min(pos).item()
             fmax = 0.09  # torch.max(pos).item()
             t = t_B1.detach().cpu().numpy()
@@ -566,12 +566,6 @@ def train(
         #     loss_weights["phase_loss"] *= 0.1
         pulse, gradient = model(t_B1)
 
-        # shift = 0.0025
-        # exponent = 1j * torch.cumsum(gradient, dim=0) * fixed_inputs["dt"] * 2 * torch.pi * shift * fixed_inputs["gam"]
-        # pulse_left = pulse * torch.exp(-exponent)
-        # pulse_right = pulse * torch.exp(exponent)
-        # pulse = pulse_left + pulse_right
-
         mxy, mz = blochsim_CK_batch(
             B1=pulse,
             G=gradient,
@@ -579,22 +573,22 @@ def train(
             sens=sens,
             B0_list=B0_list,
             M0=M0,
-            dt=fixed_inputs["dt"],
+            dt=fixed_inputs["dt_num"],
             time_loop="complex",
         )
         (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
-            fixed_inputs["pos"][:, 2],
+            fixed_inputs["pos"],
             mz,
             mxy,
             target_z,
             target_xy,
             pulse,
             gradient,
-            1000 * fixed_inputs["dt"],
+            fixed_inputs["dt_num"],
             scanner_params=scanner_params,
             loss_weights=loss_weights,
             metric=loss_metric,
-            verbose=True,
+            verbose=False,
         )
         loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
 
@@ -605,9 +599,7 @@ def train(
         if suppress_loss_peaks:
             # model = regularize_model_gradients(model)
             if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
-                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
-                    "results/train_log.pt", mode="train", device=device
-                )
+                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data("results/train_log.pt", mode="train", device=device)
                 for param_group in optimizer.param_groups:
                     param_group["lr"] *= 0.1
                 print("Loss peak detected, reloading model and reducing learning rate.")
