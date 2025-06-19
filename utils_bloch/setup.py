@@ -41,7 +41,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512):
     return {
         "pos": pos,
         "dt": dt,
-        "dt_num": dt_num.item(),
+        "dt_num": dt_num.item() * 1e-3,
         "dx": dx.item(),
         "Nz": Nz,
         "sens": sens,

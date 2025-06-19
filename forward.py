@@ -13,7 +13,7 @@ B1, G, target_z, target_xy, fixed_inputs = load_data(path)
 fig, ax = plt.subplots(figsize=(12, 6))
 for Nt in [64, 128, 256, 512, 1024, 2048]:
     (model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, start_epoch) = load_data(path, mode="train")
-    fixed_inputs = get_fixed_inputs(tfactor=1.0, n_b0_values=n_b0_values, Nz=2048, Nt=Nt)
+    fixed_inputs = get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=1024, Nt=Nt)
     B1, G = model(fixed_inputs["t_B1"])
 
     # shift = 0.0025
