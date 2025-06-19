@@ -339,7 +339,7 @@ def loss_fn(
     # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
     # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
     # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
-    phase_loss = (0 + 0 + phase_diff_loss).mean(dim=0)
+    phase_loss = phase_diff_loss.mean(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -353,7 +353,7 @@ def loss_fn(
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
         # print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
         # print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
-        print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
+        # print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
         # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
     return (
@@ -607,9 +607,7 @@ def train(
         if suppress_loss_peaks:
             # model = regularize_model_gradients(model)
             if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
-                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
-                    "results/train_log.pt", mode="train", device=device
-                )
+                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data("results/train_log.pt", mode="train", device=device)
                 for param_group in optimizer.param_groups:
                     param_group["lr"] *= 0.1
                 print("Loss peak detected, reloading model and reducing learning rate.")
