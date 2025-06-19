@@ -26,7 +26,7 @@ loss_weights = {
 n_slices = 1
 n_b0_values = 3
 flip_angle = 0.5 * np.pi
-fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values)
+fixed_inputs = get_fixed_inputs(tfactor=1.0, n_b0_values=n_b0_values)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
