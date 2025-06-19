@@ -128,10 +128,10 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
-        if epoch % 1000 == 0 and epoch > 0:
-            freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
-            plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
-            plt.show(block=False)
+        # if epoch % 1000 == 0 and epoch > 0:
+        #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
+        #     plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
+        #     plt.show(block=False)
 
         if epoch % self.output_every == 0 or export_figure:
             pos = pos.cpu()
@@ -576,7 +576,15 @@ def train(
             dt=fixed_inputs["dt_num"],
             time_loop="complex",
         )
-        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
+        (
+            loss_mxy,
+            loss_mz,
+            boundary_vals_pulse,
+            gradient_height_loss,
+            pulse_height_loss,
+            gradient_diff_loss,
+            phase_loss,
+        ) = loss_fn(
             fixed_inputs["pos"],
             mz,
             mxy,

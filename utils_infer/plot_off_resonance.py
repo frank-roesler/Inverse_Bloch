@@ -80,7 +80,6 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
 
 
 def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=None):
-    from params import fixed_inputs
     from utils_train.utils import move_to
 
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
@@ -122,11 +121,12 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
             phase_mean_slice = np.mean(phase_loc)
             phase_means.append(phase_mean_slice)
             print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-        print(
-            "Difference:",
-            f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
-            f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
-        )
+        if len(phase_means) > 1:
+            print(
+                "Difference:",
+                f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
+                f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
+            )
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 
