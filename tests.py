@@ -1,5 +1,5 @@
-import torch
-import matplotlib.pyplot as plt
+# import torch
+# import matplotlib.pyplot as plt
 
 # from utils_train.nets import *
 
@@ -103,12 +103,12 @@ import matplotlib.pyplot as plt
 #         print(f"{name}: {param.grad}")
 
 
-dic = torch.load("results/FourierSeries_pre-trained_square/train_log.pt", weights_only=False)
-pulse = dic["pulse"].detach().cpu()
-grad = dic["gradient"].detach().cpu()
+# dic = torch.load("results/FourierSeries_pre-trained_square/train_log.pt", weights_only=False)
+# pulse = dic["pulse"].detach().cpu()
+# grad = dic["gradient"].detach().cpu()
 
-plt.plot(pulse)
-plt.plot(torch.imag(pulse))
-plt.figure()
-plt.plot(grad)
-plt.show()
+# plt.plot(pulse)
+# plt.plot(torch.imag(pulse))
+# plt.figure()
+# plt.plot(grad)
+# plt.show()

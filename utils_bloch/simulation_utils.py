@@ -17,6 +17,7 @@ def setup_simulation(G, pos, sens, B0_list, B1):
     # Sum up RF over coils: bxy = sens * B1.T
     bxy = torch.matmul(sens, B1.T)  # Ns x Nt
     # Sum up gradient over channels: bz = pos * G.T
+    pos = torch.stack([torch.zeros_like(pos), torch.zeros_like(pos), pos], dim=-1)
     bz = torch.matmul(pos, G.T)  # Ns x Nt
 
     # Add off-resonance for each B0 value

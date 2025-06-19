@@ -128,13 +128,13 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
         """plots info curves during training"""
-        if epoch % 1000 == 0 and epoch > 0:
-            freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
-            plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
-            plt.show(block=False)
+        # if epoch % 1000 == 0 and epoch > 0:
+        #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
+        #     plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
+        #     plt.show(block=False)
 
         if epoch % self.output_every == 0 or export_figure:
-            pos = pos.cpu()[:, 2]
+            pos = pos.cpu()
             fmin = -0.09  # torch.min(pos).item()
             fmax = 0.09  # torch.max(pos).item()
             t = t_B1.detach().cpu().numpy()
@@ -147,7 +147,7 @@ class InfoScreen:
             pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()), axis=-1)
-            where_slices_are = tgt_xy > 0.5
+            where_slices_are = tgt_xy > 1e-2
             phasemin = np.min(phase[:, where_slices_are])
             phasemax = np.max(phase[:, where_slices_are])
             phasemin = phasemin - 0.5 * (phasemax - phasemin)
@@ -224,7 +224,7 @@ class InfoScreen:
 
 
 def get_device():
-    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cpu") if torch.cuda.is_available() else torch.device("cpu")
     print("Device:", device)
     return device
 
@@ -288,7 +288,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=1e-7)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=1e-6)
     losses = []
     return model, optimizer, scheduler, losses
 
@@ -331,15 +331,15 @@ def loss_fn(
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase = torch_unwrap(torch.angle(xy_profile))
     phase_diff = torch.diff(phase)
-    phase_ddiff = torch.diff(phase_diff)
-    where_peaks_are = target_xy > 1e-6
-    phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
-    phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    # phase_ddiff = torch.diff(phase_diff)
+    where_peaks_are = target_xy > 1e-2
+    # phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
+    # phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
     phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
     # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
     # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
     # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
-    phase_loss = (phase_ddiff + phase_diff_var + phase_diff_loss).mean(dim=0)
+    phase_loss = (0 + 0 + phase_diff_loss).mean(dim=0)
 
     if verbose:
         print("-" * 50)
@@ -351,8 +351,8 @@ def loss_fn(
         print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
         print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
         print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
-        print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
-        print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
+        # print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
+        # print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
         print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
         # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
@@ -566,12 +566,6 @@ def train(
         #     loss_weights["phase_loss"] *= 0.1
         pulse, gradient = model(t_B1)
 
-        # shift = 0.0025
-        # exponent = 1j * torch.cumsum(gradient, dim=0) * fixed_inputs["dt"] * 2 * torch.pi * shift * fixed_inputs["gam"]
-        # pulse_left = pulse * torch.exp(-exponent)
-        # pulse_right = pulse * torch.exp(exponent)
-        # pulse = pulse_left + pulse_right
-
         mxy, mz = blochsim_CK_batch(
             B1=pulse,
             G=gradient,
@@ -579,18 +573,26 @@ def train(
             sens=sens,
             B0_list=B0_list,
             M0=M0,
-            dt=fixed_inputs["dt"],
+            dt=fixed_inputs["dt_num"],
             time_loop="complex",
         )
-        (loss_mxy, loss_mz, boundary_vals_pulse, gradient_height_loss, pulse_height_loss, gradient_diff_loss, phase_loss) = loss_fn(
-            fixed_inputs["pos"][:, 2],
+        (
+            loss_mxy,
+            loss_mz,
+            boundary_vals_pulse,
+            gradient_height_loss,
+            pulse_height_loss,
+            gradient_diff_loss,
+            phase_loss,
+        ) = loss_fn(
+            fixed_inputs["pos"],
             mz,
             mxy,
             target_z,
             target_xy,
             pulse,
             gradient,
-            1000 * fixed_inputs["dt"],
+            fixed_inputs["dt_num"],
             scanner_params=scanner_params,
             loss_weights=loss_weights,
             metric=loss_metric,
