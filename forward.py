@@ -19,6 +19,7 @@ B1, G, target_z, target_xy, fixed_inputs = load_data(path)
 # target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
 
 (model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, start_epoch) = load_data(path, mode="train")
+fixed_inputs["pos"] = torch.stack([torch.zeros_like(fixed_inputs["pos"]), torch.zeros_like(fixed_inputs["pos"]), fixed_inputs["pos"]], dim=-1)
 B1, G = model(fixed_inputs["t_B1"])
 
 print("PULS AMPLITUDE:", torch.max(torch.abs(B1)).item())
