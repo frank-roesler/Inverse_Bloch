@@ -11,9 +11,9 @@ target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_a
 B1, G, target_z, target_xy, fixed_inputs = load_data(path)
 
 fig, ax = plt.subplots(figsize=(12, 6))
-for Nt in [64, 128, 256, 512, 1024, 2048]:
+for Nt in [128, 256, 512, 1024]:
     (model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, start_epoch) = load_data(path, mode="train")
-    fixed_inputs = get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=512, Nt=Nt)
+    fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=1, Nz=256, Nt=Nt)
     B1, G = model(fixed_inputs["t_B1"])
 
     # shift = 0.0025
@@ -33,6 +33,6 @@ for Nt in [64, 128, 256, 512, 1024, 2048]:
     with torch.no_grad():
         # plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, path=path, block=True)
         plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=path)
-        plot_timeprof(fixed_inputs, B1, G, fixed_inputs, slice_centers, path=path, fig=fig, ax=ax)
+        # plot_timeprof(fixed_inputs, B1, G, fixed_inputs, slice_centers, path=path, fig=fig, ax=ax)
         # plot_fit_error(fixed_inputs, B1, G, slice_centers, half_width)
 plt.show()

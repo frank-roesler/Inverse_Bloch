@@ -7,7 +7,7 @@ start_epoch = 0
 epochs = 20000
 resume_from_path = None  # "results/train_log.pt"  # path to resume training from
 lr = {"pulse": 5e-5, "gradient": 5e-5}  # learning rate
-plot_loss_frequency = 10  # plot every n steps
+plot_loss_frequency = 100  # plot every n steps
 start_logging = 100  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 suppress_loss_peaks = False  # detect peaks in loss function and reduce lr
@@ -26,7 +26,7 @@ loss_weights = {
 n_slices = 1
 n_b0_values = 1
 flip_angle = 0.5 * np.pi
-fixed_inputs = get_fixed_inputs(tfactor=1.0, n_b0_values=n_b0_values, Nz=512, Nt=128)
+fixed_inputs = get_fixed_inputs(tfactor=2.0, n_b0_values=n_b0_values, Nz=256, Nt=128)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
