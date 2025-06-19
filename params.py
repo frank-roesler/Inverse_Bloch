@@ -24,7 +24,7 @@ loss_weights = {
 
 # BLOCH PARAMETERS:
 n_slices = 1
-n_b0_values = 1
+n_b0_values = 3
 flip_angle = 0.5 * np.pi
 fixed_inputs = get_fixed_inputs(tfactor=4.0, n_b0_values=n_b0_values, Nz=256, Nt=64)
 

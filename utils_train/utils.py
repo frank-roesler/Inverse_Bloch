@@ -224,7 +224,7 @@ class InfoScreen:
 
 
 def get_device():
-    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cpu") if torch.cuda.is_available() else torch.device("cpu")
     print("Device:", device)
     return device
 
@@ -331,10 +331,10 @@ def loss_fn(
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase = torch_unwrap(torch.angle(xy_profile))
     phase_diff = torch.diff(phase)
-    phase_ddiff = torch.diff(phase_diff)
+    # phase_ddiff = torch.diff(phase_diff)
     where_peaks_are = target_xy > 1e-2
-    phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
-    phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    # phase_ddiff = 100 * torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
+    # phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
     phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
     # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
     # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
