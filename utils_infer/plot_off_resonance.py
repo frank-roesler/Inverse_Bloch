@@ -122,11 +122,12 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
             phase_mean_slice = np.mean(phase_loc)
             phase_means.append(phase_mean_slice)
             print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-        print(
-            "Difference:",
-            f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
-            f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
-        )
+        if len(phase_means) > 1:
+            print(
+                "Difference:",
+                f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
+                f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
+            )
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 
