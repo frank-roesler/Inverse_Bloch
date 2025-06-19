@@ -10,13 +10,14 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
     npts = len(freq_offsets_Hz)
     pos = fixed_inputs["pos"].detach().cpu()
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(
+        fixed_inputs,
         rf.detach().cpu(),
         grad.detach().cpu(),
         pos=pos,
         sens=fixed_inputs["sens"].detach().cpu(),
         B0=fixed_inputs["B0"].detach().cpu(),
         M0=fixed_inputs["M0"].detach().cpu(),
-        dt=fixed_inputs["dt"],
+        dt=fixed_inputs["dt_num"],
         freq_offsets_Hz=freq_offsets_Hz,
     )
 
@@ -27,8 +28,8 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
     img_extent = [
         linspace(-8000, 8000, npts).min() / 297.3 + 4.7,
         linspace(-8000, 8000, npts).max() / 297.3 + 4.7,
-        squeeze(pos[:, 2] * 100).max(),
-        squeeze(pos[:, 2] * 100).min(),
+        squeeze(pos * 100).max(),
+        squeeze(pos * 100).min(),
     ]
     # Subplot 1: abs(Mxy)
     im1 = axes[0].imshow(
@@ -80,7 +81,6 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
 
 
 def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=None):
-    from params import fixed_inputs
     from utils_train.utils import move_to
 
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
@@ -93,7 +93,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         B0_list.append(fixed_inputs["B0"] + B0_freq_offsets_mT[ff])
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
-    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt"])
+    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):
@@ -105,10 +105,10 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         ax01 = ax[0, 1].twinx()
         ax01.plot([], [])
         ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1)
-        ax[1, 0].plot(pos[:, 2], np.real(mz[ff, :]), linewidth=0.8)
-        ax[1, 0].plot(pos[:, 2], target_z, linewidth=0.8)
-        ax[1, 1].plot(pos[:, 2], np.abs(mxy[ff, :]), linewidth=0.8)
-        ax[1, 1].plot(pos[:, 2], target_xy, linewidth=0.8)
+        ax[1, 0].plot(pos, np.real(mz[ff, :]), linewidth=0.8)
+        ax[1, 0].plot(pos, target_z, linewidth=0.8)
+        ax[1, 1].plot(pos, np.abs(mxy[ff, :]), linewidth=0.8)
+        ax[1, 1].plot(pos, target_xy, linewidth=0.8)
 
         phase = np.unwrap(np.angle(mxy[ff, :]))
         phasemin = np.inf
@@ -122,11 +122,12 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
             phase_mean_slice = np.mean(phase_loc)
             phase_means.append(phase_mean_slice)
             print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-        print(
-            "Difference:",
-            f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
-            f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
-        )
+        if len(phase_means) > 1:
+            print(
+                "Difference:",
+                f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
+                f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
+            )
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 
@@ -134,6 +135,6 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         ax_phase = ax[1, 1].twinx()
         ax_phase.set_ylabel("Phase (radians)")
         ax_phase.set_ylim(phasemin, phasemax)
-        ax_phase.plot(pos[:, 2], phase, linewidth=0.8, color="g")
+        ax_phase.plot(pos, phase, linewidth=0.8, color="g")
         if path is not None:
             fig.savefig(os.path.join(os.path.dirname(path), f"B0_{ff}.png"), dpi=300)

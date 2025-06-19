@@ -10,7 +10,7 @@ def setup_simulation(G, pos, sens, B0_list, B1):
     Nb = B0_list.shape[0]  # Number of B0 values
 
     bxy = torch.matmul(sens, B1.T)  # Ns x Nt
-    bz = pos[:, 2:] * G  # Ns x Nt
+    bz = pos * G  # Ns x Nt
 
     bz = bz.unsqueeze(0).repeat(Nb, 1, 1)  # Expand bz to shape (Nb, Ns, Nt)
     B0_list = B0_list.expand(-1, -1, bz.shape[2])  # Expand B0_list to shape (Nb, Ns, Nt)

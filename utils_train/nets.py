@@ -166,9 +166,7 @@ class RBFN(PulseGradientBase):
 
 
 class FourierMLP(PulseGradientBase):
-    def __init__(
-        self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs
-    ):
+    def __init__(self, input_dim=1, hidden_dim=64, output_dim=3, num_layers=3, num_fourier_features=10, frequency_scale=10, tmin=None, tmax=None, **kwargs):
         super(FourierMLP, self).__init__(tmin=tmin, tmax=tmax, output_dim=output_dim, **kwargs)
         self.fourier_weights = nn.Parameter(frequency_scale * torch.randn(num_fourier_features, input_dim))
         layers = [nn.Linear(num_fourier_features * 2, hidden_dim), nn.ReLU()]
@@ -239,11 +237,7 @@ class NoModel(PulseGradientBase):
         p = self.smooth_params(p)
         p = self.smooth_params(p)
 
-        bdry_scaling = (
-            (tvector - self.tmin) * (self.tmax - tvector) / (self.tmax - self.tmin)
-            if self.tmin is not None and self.tmax is not None
-            else torch.ones_like(tvector)
-        )
+        bdry_scaling = (tvector - self.tmin) * (self.tmax - tvector) / (self.tmax - self.tmin) if self.tmin is not None and self.tmax is not None else torch.ones_like(tvector)
         p[:, 0:2] = p[:, 0:2] * bdry_scaling.unsqueeze(1)
         p[:, 2] = sqrt(self.gradient_scale) * (100 * sqrt(self.gradient_scale) * p[:, 2] + 1)
         self.params = torch.nn.Parameter(p)
