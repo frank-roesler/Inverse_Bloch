@@ -1,6 +1,7 @@
 import scipy
 import torch
 import numpy as np
+import params
 
 # from utils_bloch.blochsim_CK import blochsim_CK
 # from buildTarget import buildTarget
@@ -16,9 +17,9 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512):
     dt = inputs["dt"]
     sens = torch.ones((Nz, 1), dtype=torch.complex64)
     B0 = torch.zeros((Nz, 1))
-    pts_B1 = len(inputs["rfmb"])
     Tmin = dt * 1e3 * 512
     T = Tmin * tfactor
+    Nt = int(Nt * tfactor)
     t_B1 = torch.linspace(0, T, Nt)
     dt_num = (t_B1[-1] - t_B1[0]) / (len(t_B1) - 1)
     t_B1 = t_B1.float()
@@ -80,33 +81,31 @@ def smooth_square_well(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0, func
     return well
 
 
-def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1):
+def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1, pos=torch.linspace(-0.18, 0.18, 4096)):
     """higher smoothness values give sharper transitions"""
-    import params
 
-    posAx = params.fixed_inputs["pos"]
     smoothness *= 1000.0
 
     width = 0.02
     distance = 0.01
     left = -0.5 * (width * n_targets + distance * (n_targets - 1))
 
-    pos0 = np.argmin(np.abs(posAx)).item()
-    posAtWidth = np.argmin(np.abs(posAx - width / 2)).item()
+    pos0 = np.argmin(np.abs(pos)).item()
+    posAtWidth = np.argmin(np.abs(pos - width / 2)).item()
     half_width = posAtWidth - pos0
 
-    target_xy = torch.zeros(posAx.shape, dtype=torch.float32, requires_grad=False)
+    target_xy = torch.zeros(pos.shape, dtype=torch.float32, requires_grad=False)
     centers = []
     for i in range(n_targets):
         target_xy += smooth_square_well(
-            posAx,
+            pos,
             left=left,
             right=left + width,
             depth=np.sin(theta),
             smoothness=smoothness,
             function=function,
         )
-        centers.append(np.argmin(np.abs(posAx - (left + 0.5 * width))).item())
+        centers.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
         left += width + distance
 
     target_z = torch.sqrt(1 - target_xy**2)

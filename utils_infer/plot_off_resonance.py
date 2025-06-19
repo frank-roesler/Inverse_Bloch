@@ -10,6 +10,7 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
     npts = len(freq_offsets_Hz)
     pos = fixed_inputs["pos"].detach().cpu()
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(
+        fixed_inputs,
         rf.detach().cpu(),
         grad.detach().cpu(),
         pos=pos,

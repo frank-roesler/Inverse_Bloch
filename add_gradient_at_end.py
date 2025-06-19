@@ -31,7 +31,7 @@ B1_left = B1 * torch.exp(-exponent)
 B1_right = B1 * torch.exp(exponent)
 B1 = B1_left + B1_right
 n_slices = 2
-target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices)
+target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=3.0, function=torch.sigmoid, n_targets=n_slices, pos=fixed_inputs["pos"])
 
 mxy, mz = simulate_B0_values(fixed_inputs, B1, G)
 phase = np.unwrap(np.angle(mxy[0, :]))
