@@ -19,7 +19,7 @@ loss_weights = {
     "gradient_height_loss": 0.1,
     "pulse_height_loss": 100.0,
     "gradient_diff_loss": 1.0,
-    "phase_loss": 1.0,
+    "phase_loss": 100.0,
 }
 
 # BLOCH PARAMETERS:
@@ -27,8 +27,8 @@ n_slices = 2
 n_b0_values = 3
 flip_angle = 0.5 * np.pi
 tfactor = 2  # pulse time is 0.64ms * tfactor
-Nz = 256  # number of mesh points in pos axis
-Nt = 64  # number of mesh points per 0.64ms time interval
+Nz = 2048  # number of mesh points in pos axis
+Nt = 128  # number of mesh points per 0.64ms time interval
 fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt)
 
 # MODEL PARAMETERS:
@@ -55,5 +55,5 @@ model_args = {
 scanner_params = {
     "max_gradient": 50,  # mT/m
     "max_diff_gradient": 200,  # mT/m/ms
-    "max_pulse_amplitude": 0.04,  # mT
+    "max_pulse_amplitude": 0.035,  # mT
 }

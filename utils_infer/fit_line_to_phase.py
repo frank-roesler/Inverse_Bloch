@@ -58,3 +58,6 @@ def plot_fit_error(fixed_inputs, B1, G, centers, half_width, path=None):
     plt.title("Phase Fitting and Error")
     plt.xlabel("pos")
     plt.ylabel("Phase Value")
+
+    if path is not None:
+        fig.savefig(os.path.join(os.path.dirname(path), f"phase_error.png"), dpi=300)

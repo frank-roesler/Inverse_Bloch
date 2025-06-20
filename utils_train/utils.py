@@ -14,7 +14,22 @@ from utils_infer import plot_off_resonance
 
 
 class TrainLogger:
-    def __init__(self, fixed_inputs, flip_angle, loss_metric, targets, model_args, scanner_params, loss_weights, start_logging=1):
+    def __init__(
+        self,
+        fixed_inputs,
+        flip_angle,
+        loss_metric,
+        targets,
+        model_args,
+        scanner_params,
+        loss_weights,
+        n_slices,
+        n_b0_values,
+        tfactor,
+        Nz,
+        Nt,
+        start_logging=1,
+    ):
         self.log = {}
         self.start_logging = start_logging
         self.best_loss = np.inf
@@ -24,6 +39,11 @@ class TrainLogger:
         self.targets = targets
         self.model_args = model_args
         self.scanner_params = scanner_params
+        self.n_slices = n_slices
+        self.n_b0_values = n_b0_values
+        self.tfactor = tfactor
+        self.Nz = Nz
+        self.Nt = Nt
         self.loss_weights = loss_weights
         self.log["flip_angle"] = self.flip_angle
         self.log["loss_metric"] = self.loss_metric
@@ -330,8 +350,8 @@ def loss_fn(
     else:
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase = torch_unwrap(torch.angle(xy_profile))
-    phase_diff = torch.diff(phase)
-    phase_ddiff = torch.diff(phase_diff)
+    phase_diff = torch.diff(phase) * delta_t
+    phase_ddiff = torch.diff(phase_diff) * delta_t
     where_peaks_are = target_xy > 1e-2
     phase_ddiff = torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
     phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
@@ -378,18 +398,24 @@ def load_data(path, mode="inference", device="cpu"):
 
 
 def load_data_new(path, mode="inference", device="cpu"):
+    import params
+    from utils_bloch.setup import get_smooth_targets
+
     data_dict = torch.load(path, weights_only=False, map_location=device)
-    target_z = data_dict["targets"]["target_z"]
-    target_xy = data_dict["targets"]["target_xy"]
+    # target_z = data_dict["targets"]["target_z"]
+    # target_xy = data_dict["targets"]["target_xy"]
     epoch = data_dict["epoch"]
     losses = data_dict["losses"]
     model = data_dict["model"]
     optimizer = data_dict["optimizer"]
-    fixed_inputs = data_dict["fixed_inputs"]
+    # fixed_inputs = data_dict["fixed_inputs"]
     flip_angle = data_dict["flip_angle"]
     loss_metric = data_dict["loss_metric"]
     scanner_params = data_dict["scanner_params"]
     loss_weights = data_dict["loss_weights"]
+    fixed_inputs = params.get_fixed_inputs(tfactor=params.tfactor, n_b0_values=params.n_b0_values, Nz=params.Nz, Nt=params.Nt)
+    target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"])
+
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
@@ -511,6 +537,11 @@ def train(
     loss_metric,
     scanner_params,
     loss_weights,
+    n_slices,
+    n_b0_values,
+    tfactor,
+    Nz,
+    Nt,
     start_epoch,
     epochs,
     device,
@@ -559,6 +590,11 @@ def train(
         model_args,
         scanner_params,
         loss_weights,
+        n_slices,
+        n_b0_values,
+        tfactor,
+        Nz,
+        Nt,
         start_logging=start_logging,
     )
     for epoch in range(start_epoch, epochs + 1):
