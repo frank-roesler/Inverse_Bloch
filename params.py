@@ -23,10 +23,13 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 1
-n_b0_values = 3
+n_slices = 2
+n_b0_values = 1
 flip_angle = 0.5 * np.pi
-fixed_inputs = get_fixed_inputs(tfactor=4.0, n_b0_values=n_b0_values, Nz=256, Nt=64)
+tfactor = 6  # pulse time is 0.64ms * tfactor
+Nz = 256  # number of mesh points in pos axis
+Nt = 64  # number of mesh points per 0.64ms time interval
+fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -41,8 +44,8 @@ model_args = {
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
     "tvector": fixed_inputs["t_B1"][:, 0],  # NoModel
-    "gradient_scale": 20.0,  # relative size of gradient to RF pulse
-    "positive_gradient": False,
+    "gradient_scale": 50.0,  # relative size of gradient to RF pulse
+    "positive_gradient": True,
     "tmin": fixed_inputs["t_B1"][0].item(),
     "tmax": fixed_inputs["t_B1"][-1].item(),
 }

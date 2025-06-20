@@ -224,7 +224,7 @@ class InfoScreen:
 
 
 def get_device():
-    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cpu") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device("cpu") if torch.backends.mps.is_available() else torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     print("Device:", device)
     return device
 
@@ -607,7 +607,9 @@ def train(
         if suppress_loss_peaks:
             # model = regularize_model_gradients(model)
             if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
-                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data("results/train_log.pt", mode="train", device=device)
+                (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
+                    "results/train_log.pt", mode="train", device=device
+                )
                 for param_group in optimizer.param_groups:
                     param_group["lr"] *= 0.1
                 print("Loss peak detected, reloading model and reducing learning rate.")
