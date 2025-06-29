@@ -80,9 +80,13 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
 
 
-def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slice_centers, half_width, path=None):
+def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
     from utils_train.utils import move_to
+    from utils_bloch.setup import get_smooth_targets
 
+    target_z, target_xy, slice_centers, half_width = get_smooth_targets(
+        theta=params.flip_angle, smoothness=params.target_smoothness, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"], n_b0_values=n_values
+    )
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
     pos = fixed_inputs["pos"]
@@ -103,12 +107,11 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
         ax[0, 1].plot(t_B1, G * np.ones(t_B1.shape), linewidth=0.8)
         ax01 = ax[0, 1].twinx()
-        ax01.plot([], [])
         ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1)
         ax[1, 0].plot(pos, np.real(mz[ff, :]), linewidth=0.8)
-        ax[1, 0].plot(pos, target_z, linewidth=0.8)
+        ax[1, 0].plot(pos, target_z[ff, :], linewidth=0.8)
         ax[1, 1].plot(pos, np.abs(mxy[ff, :]), linewidth=0.8)
-        ax[1, 1].plot(pos, target_xy, linewidth=0.8)
+        ax[1, 1].plot(pos, target_xy[ff, :], linewidth=0.8)
 
         phase = np.unwrap(np.angle(mxy[ff, :]))
         phasemin = np.inf
@@ -131,7 +134,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, target_xy, target_z, slic
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 
-        phase[target_xy < 0.5] = np.nan
+        phase[target_xy[ff, :] < 0.5] = np.nan
         ax_phase = ax[1, 1].twinx()
         ax_phase.set_ylabel("Phase (radians)")
         ax_phase.set_ylim(phasemin, phasemax)

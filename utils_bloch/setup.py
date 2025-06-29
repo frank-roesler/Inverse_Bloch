@@ -1,14 +1,13 @@
 import scipy
 import torch
 import numpy as np
-import params
 
 # from utils_bloch.blochsim_CK import blochsim_CK
 # from buildTarget import buildTarget
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512):
+def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="linear"):
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
@@ -21,9 +20,19 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512):
     T = Tmin * tfactor
     Nt = int(Nt * tfactor)
     t_B1 = torch.linspace(0, T, Nt)
-    dt_num = (t_B1[-1] - t_B1[0]) / (len(t_B1) - 1)
     t_B1 = t_B1.float()
-    pos = torch.linspace(-0.18, 0.18, Nz)
+    dt_num = (t_B1[-1] - t_B1[0]) / (len(t_B1) - 1)
+
+    if pos_spacing == "nonlinear":
+        u = torch.linspace(-1, 1, Nz)
+        pos = abs(u) ** 3
+        pos[u < 0] = -pos[u < 0]
+        pos += 0.5 * u
+        pos = 2 * 0.18 * pos / (torch.max(pos) - torch.min(pos))
+        pos = pos.detach()
+    else:
+        pos = torch.linspace(-0.18, 0.18, Nz)
+
     dx = (pos[-1] - pos[0]) / (len(pos) - 1)
     inputs["pos"] = pos
     sens = sens.detach().requires_grad_(False)
@@ -41,13 +50,14 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512):
     B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
     return {
         "pos": pos,
-        "dt": dt,
+        "dt": dt * tfactor,
         "dt_num": dt_num.item() * 1e-3,
         "dx": dx.item(),
         "Nz": Nz,
         "sens": sens,
         "B0": B0,
         "t_B1": t_B1.unsqueeze(1),
+        "t_B1_legacy": torch.arange(0, len(inputs["rfmb"])).unsqueeze(1) * dt * 1e3 * tfactor,
         "M0": M0,
         "inputs": inputs,
         "freq_offsets_Hz": freq_offsets_Hz,
@@ -81,7 +91,14 @@ def smooth_square_well(x, left=-0.5, right=0.5, depth=1.0, smoothness=10.0, func
     return well
 
 
-def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1, pos=torch.linspace(-0.18, 0.18, 4096)):
+def circshift(x, shift):
+    shift = shift % x.numel()
+    if shift == 0:
+        return x
+    return torch.cat((x[-shift:], x[:-shift]))
+
+
+def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1, pos=torch.linspace(-0.18, 0.18, 4096), n_b0_values=1):
     """higher smoothness values give sharper transitions"""
 
     smoothness *= 1000.0
@@ -108,5 +125,19 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
         centers.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
         left += width + distance
 
+    targets = []
+    minShift = n_b0_values // 2
+    for i in range(-minShift, minShift + 1):
+        shift = 0  # pos.shape[0] // 100 * i
+        targets.append(circshift(target_xy, shift))
+    target_xy = torch.stack(targets, dim=0)
     target_z = torch.sqrt(1 - target_xy**2)
     return target_z, target_xy, centers, half_width
+
+
+# fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=512, Nt=64, pos_spacing="nonlinear")
+# pos = fixed_inputs["pos"]
+# import matplotlib.pyplot as plt
+
+# plt.plot(pos, 0 * pos, ".", markersize=2)
+# plt.show()

@@ -30,43 +30,39 @@ class TrainLogger:
         Nt,
         start_logging=1,
     ):
-        self.log = {}
+        self.log = {
+            "flip_angle": flip_angle,
+            "loss_metric": loss_metric,
+            "model_args": model_args,
+            "scanner_params": scanner_params,
+            "loss_weights": loss_weights,
+            "fixed_inputs": fixed_inputs,
+            "targets": targets,
+            "n_slices": n_slices,
+            "n_b0_values": n_b0_values,
+            "tfactor": tfactor,
+            "Nz": Nz,
+            "Nt": Nt,
+        }
         self.start_logging = start_logging
         self.best_loss = np.inf
-        self.fixed_inputs = fixed_inputs
-        self.flip_angle = flip_angle
-        self.loss_metric = loss_metric
-        self.targets = targets
-        self.model_args = model_args
-        self.scanner_params = scanner_params
-        self.n_slices = n_slices
-        self.n_b0_values = n_b0_values
-        self.tfactor = tfactor
-        self.Nz = Nz
-        self.Nt = Nt
         self.loss_weights = loss_weights
-        self.log["flip_angle"] = self.flip_angle
-        self.log["loss_metric"] = self.loss_metric
-        self.log["model_args"] = model_args
-        self.log["scanner_params"] = self.scanner_params
-        self.log["loss_weights"] = self.loss_weights
-        self.log["fixed_inputs"] = self.fixed_inputs
-        self.log["targets"] = self.targets
 
-    def log_epoch(self, epoch, total_loss, losses, model, optimizer, pulse, gradient):
+    def log_epoch(self, epoch, losses, model, optimizer):
         self.log["epoch"] = epoch
-        self.log["L2_loss"] = total_loss.item()
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
-        self.log["pulse"] = pulse
-        self.log["gradient"] = gradient
+        with torch.no_grad():
+            pulse, gradient = model(self.log["fixed_inputs"]["t_B1_legacy"])
+        self.log["pulse"] = pulse.detach().cpu()
+        self.log["gradient"] = gradient.detach().cpu()
         return self.save(epoch, losses)
 
     def save(self, epoch, losses, filename="results/train_log.pt"):
-        if not losses[-1] < 0.99 * self.best_loss:
+        if not losses["total"][-1] < 0.99 * self.best_loss:
             return False
-        self.best_loss = losses[-1]
+        self.best_loss = losses["total"][-1]
         if epoch <= self.start_logging:
             return False
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -101,14 +97,14 @@ class TrainLogger:
 
 
 class InfoScreen:
-    def __init__(self, output_every=1):
+    def __init__(self, output_every=1, losses={}):
         self.t0 = time()
         self.t1 = time()
         self.output_every = output_every
-        self.init_plots()
+        self.init_plots(losses)
 
-    def init_plots(self):
-        self.fig = plt.figure(figsize=(13, 7), constrained_layout=False)
+    def init_plots(self, losses):
+        self.fig = plt.figure(figsize=(14, 7), constrained_layout=False)
         spec = gridspec.GridSpec(2, 2, figure=self.fig)  # Create a 2x2 grid layout
 
         # First row: 3 plots spanning the entire width
@@ -123,17 +119,20 @@ class InfoScreen:
         self.ax_phase = self.ax_bottom_right.twinx()
         self.ax_phase.set_ylabel("Phase (radians)")
         self.ax_bottom_right.set_ylabel("|M_xy|")
+        self.loss_lines = {}
 
         # Initialize plots for the first row
         self.pulse_real_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="Pulse real")[0]
         self.pulse_imag_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="Pulse imag")[0]
         self.pulse_abs_plot = self.ax[0].plot([0], [1e-4], linewidth=0.8, label="|Pulse|", linestyle="dotted")[0]
         self.grad_plot = self.ax[1].plot([0], [1], linewidth=0.8, label="Gradient")[0]
-        self.loss_plot = self.ax[2].semilogy([0], [1e-1], linewidth=0.8, label="Loss")[0]
+        cmap = cm.get_cmap("tab10", len(losses))
+        for idx, loss_key in enumerate(losses.keys()):
+            color = cmap(idx)
+            (self.loss_lines[loss_key],) = self.ax[2].semilogy([0], [1e-1], linewidth=0.8, label=loss_key, color=color)
 
-        # Initialize plots for the second row
-        self.target_z_plot = self.ax_bottom_left.plot([0], [1], linewidth=0.8, label="Target_z")[0]
-        self.target_xy_plot = self.ax_bottom_right.plot([0], [1], linewidth=0.8, label="Target_xy")[0]
+        self.ax[2].legend(loc="lower left", bbox_to_anchor=(1.01, 0.5), borderaxespad=0, fontsize="x-small")
+        self.fig.subplots_adjust(right=0.89)
 
         # Set titles and legends
         self.ax[0].set_title("Pulse")
@@ -143,10 +142,9 @@ class InfoScreen:
         self.ax_bottom_right.set_title("M_xy")
         self.ax[0].legend()
         self.ax[1].legend()
-        self.ax[2].legend()
         plt.show(block=False)
 
-    def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure):
+    def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, export_figure, where_slices_are):
         """plots info curves during training"""
         # if epoch % 1000 == 0 and epoch > 0:
         #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
@@ -155,8 +153,8 @@ class InfoScreen:
 
         if epoch % self.output_every == 0 or export_figure:
             pos = pos.cpu()
-            fmin = -0.09  # torch.min(pos).item()
-            fmax = 0.09  # torch.max(pos).item()
+            fmin = -0.1  # torch.min(pos).item()
+            fmax = 0.1  # torch.max(pos).item()
             t = t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
@@ -167,12 +165,11 @@ class InfoScreen:
             pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()), axis=-1)
-            where_slices_are = tgt_xy > 1e-2
-            phasemin = np.min(phase[:, where_slices_are])
-            phasemax = np.max(phase[:, where_slices_are])
+            phasemin = np.min(phase[where_slices_are])
+            phasemax = np.max(phase[where_slices_are])
             phasemin = phasemin - 0.5 * (phasemax - phasemin)
             phasemax = phasemax + 0.5 * (phasemax - phasemin)
-            phase[:, ~where_slices_are] = np.nan
+            phase[~where_slices_are] = np.nan
 
             for collection in self.ax_bottom_left.collections:
                 collection.remove()
@@ -181,24 +178,38 @@ class InfoScreen:
             for collection in self.ax_phase.collections:
                 collection.remove()
 
-            self.target_z_plot.set_xdata(pos)
-            self.target_xy_plot.set_xdata(pos)
+            # self.target_z_plot.set_xdata(pos)
+            # self.target_xy_plot.set_xdata(pos)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
             self.pulse_abs_plot.set_xdata(t)
-            self.loss_plot.set_xdata(np.arange(len(losses)))
+            # self.loss_plot.set_xdata(np.arange(len(losses)))
 
             self.add_line_collection(self.ax_bottom_left, pos, mz_plot)
             self.add_line_collection(self.ax_bottom_right, pos, mxy_abs)
             self.add_line_collection(self.ax_phase, pos, phase, linestyle="dotted")
-            self.target_z_plot.set_ydata(tgt_z)
-            self.target_xy_plot.set_ydata(tgt_xy)
+            # self.target_z_plot.set_ydata(tgt_z[1, :])
+            # self.target_xy_plot.set_ydata(tgt_xy[1, :])
+            self.add_line_collection(self.ax_bottom_left, pos, tgt_z, cmap="viridis")
+            self.add_line_collection(self.ax_bottom_right, pos, tgt_xy, cmap="viridis")
+
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
             self.pulse_imag_plot.set_ydata(pulse_imag)
             self.pulse_abs_plot.set_ydata(pulse_abs)
-            self.loss_plot.set_ydata(losses)
+            minLoss = np.inf
+            maxLoss = 0
+            for key, line in self.loss_lines.items():
+                line.set_xdata(np.arange(len(losses[key])))
+                line.set_ydata(losses[key])
+                if key == "boundary_vals_pulse":
+                    continue
+                currentMin = np.min(losses[key][-1000:])
+                if currentMin > 0:
+                    minLoss = min(minLoss, currentMin)
+                maxLoss = max(maxLoss, np.max(losses[key][-1000:]))
+            # self.loss_plot.set_ydata(losses)
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
             self.ax_bottom_right.set_xlim(fmin, fmax)
@@ -210,7 +221,7 @@ class InfoScreen:
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
-            self.ax[2].set_ylim((0.9 * np.min(losses).item(), 1.1 * np.max(losses).item()))
+            self.ax[2].set_ylim((0.9 * minLoss, 1.1 * maxLoss))
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
             self.fig.canvas.draw_idle()
@@ -221,12 +232,12 @@ class InfoScreen:
             plt.pause(0.05)
             self.fig.canvas.flush_events()
 
-    def add_line_collection(self, ax, xdata, ydata, linestyle="solid"):
+    def add_line_collection(self, ax, xdata, ydata, linestyle="solid", cmap="inferno"):
         line_list = [list(zip(xdata, ydata[b, :])) for b in range(ydata.shape[0])]
-        self.add_line_collection_from_list(ax, line_list, linestyle)
+        self.add_line_collection_from_list(ax, line_list, linestyle, cmap)
 
-    def add_line_collection_from_list(self, ax, line_list, linestyle):
-        cmap = cm.get_cmap("inferno", len(line_list) + 2)
+    def add_line_collection_from_list(self, ax, line_list, linestyle, cmap="inferno"):
+        cmap = cm.get_cmap(cmap, len(line_list) + 2)
         colors = [cmap(i + 1) for i in range(len(line_list) + 2)]
         line_collection = LineCollection(line_list, linewidths=0.7, colors=colors, linestyle=linestyle)
         ax.add_collection(line_collection)
@@ -235,7 +246,7 @@ class InfoScreen:
         self.t1 = time() - self.t0
         self.t0 = time()
         print("Epoch: ", epoch)
-        print(f"Loss: {loss:.6f}")
+        print(f"Loss: {loss['total']:.6f}")
         print(f"Best Loss: {best_loss:.6f}")
         for i, param_group in enumerate(optimizer.param_groups):
             print(f"Learning rate {i}: {param_group['lr']:.7f}")
@@ -308,8 +319,17 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=100, min_lr=1e-6)
-    losses = []
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=50, min_lr=1e-6)
+    losses = {
+        "loss_mxy": [],
+        "loss_mz": [],
+        "boundary_vals_pulse": [],
+        "gradient_height_loss": [],
+        "pulse_height_loss": [],
+        "gradient_diff_loss": [],
+        "phase_loss": [],
+        "total": [],
+    }
     return model, optimizer, scheduler, losses
 
 
@@ -333,58 +353,67 @@ def loss_fn(
     metric="L2",
     verbose=False,
 ):
+    where_peaks_are = target_xy > 1e-3
     xy_profile_abs = torch.abs(xy_profile)
     if metric == "L2":
         loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).mean(dim=0)
         loss_mz = torch.mean((z_profile - target_z) ** 2).mean(dim=0)
+        if loss_mxy < 0.04:
+            where_peaks_are = xy_profile_abs > 0.5
+            phase_reference = "model_output"
     elif metric == "L1":
         loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).mean(dim=0)
         loss_mz = torch.mean(torch.abs(z_profile - target_z)).mean(dim=0)
+        if loss_mxy < 0.09:
+            where_peaks_are = xy_profile_abs > 0.5
+            phase_reference = "model_output"
     else:
         raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
     boundary_vals_pulse = (torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2).mean(dim=0)
     gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).mean(dim=0)
     pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).mean(dim=0)
     if gradient.shape[0] > 1:
-        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t).mean(dim=0)
+        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t * 1000).mean(dim=0)
     else:
         gradient_diff_loss = torch.zeros(1, device=z_profile.device)
     phase = torch_unwrap(torch.angle(xy_profile))
-    phase_diff = torch.diff(phase) * delta_t
-    phase_ddiff = torch.diff(phase_diff) * delta_t
-    where_peaks_are = target_xy > 1e-2
-    phase_ddiff = torch.mean(phase_ddiff[:, where_peaks_are[1:-1]] ** 2, dim=-1)
-    phase_diff_var = torch.var(phase_diff[:, where_peaks_are[:-1]], dim=-1)
+    dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
+    phase_diff = torch.diff(phase) / dx
+    phase_ddiff = torch.diff(phase_diff) / dx
+    phase_ddiff = torch.mean(phase_ddiff[where_peaks_are[:, 1:-1]] ** 2, dim=-1)
+    phase_diff_var = torch.var(phase_diff[where_peaks_are[:, :-1]], dim=-1)
     # phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
-    # phase_left = phase[:, (posAx < 0) & (where_peaks_are)].mean(dim=-1)
-    # phase_right = phase[:, (posAx > 0) & (where_peaks_are)].mean(dim=-1)
-    # phase_left_right = ((torch.abs(phase_left - phase_right) - np.pi) % 2 * np.pi) ** 2
-    phase_loss = (phase_ddiff + phase_diff_var).mean(dim=0)
+    left = torch.zeros_like(where_peaks_are)
+    left[:, posAx < 0] = 1
+    right = ~left
+    leftPeak = where_peaks_are * left
+    rightPeak = where_peaks_are * right
+    phase_left = phase[leftPeak].mean(dim=-1)
+    phase_right = phase[rightPeak].mean(dim=-1)
+    phase_left_right = (torch.abs(phase_left - phase_right) - np.pi / 2) ** 2 % (np.pi**2)  # only works with 2 slices
+    phase_loss = (phase_ddiff + phase_diff_var + 1e-4 * phase_left_right).mean(dim=0)
+
+    epoch_losses = {
+        "loss_mxy": loss_weights["loss_mxy"] * loss_mxy,
+        "loss_mz": loss_weights["loss_mz"] * loss_mz,
+        "boundary_vals_pulse": loss_weights["boundary_vals_pulse"] * boundary_vals_pulse,
+        "gradient_height_loss": loss_weights["gradient_height_loss"] * gradient_height_loss,
+        "pulse_height_loss": loss_weights["pulse_height_loss"] * pulse_height_loss,
+        "gradient_diff_loss": loss_weights["gradient_diff_loss"] * gradient_diff_loss,
+        "phase_loss": loss_weights["phase_loss"] * phase_loss,
+    }
 
     if verbose:
         print("-" * 50)
         print("LOSSES:")
-        print("loss_mxy", loss_weights["loss_mxy"] * loss_mxy.item())
-        print("loss_mz", loss_weights["loss_mz"] * loss_mz.item())
-        print("boundary_vals_pulse", loss_weights["boundary_vals_pulse"] * boundary_vals_pulse.item())
-        print("gradient_height_loss", loss_weights["gradient_height_loss"] * gradient_height_loss.item())
-        print("pulse_height_loss", loss_weights["pulse_height_loss"] * pulse_height_loss.item())
-        print("gradient_diff_loss", loss_weights["gradient_diff_loss"] * gradient_diff_loss.item())
-        print("phase_loss", loss_weights["phase_loss"] * phase_loss.item())
+        for key, value in epoch_losses.items():
+            print(f"{key}: {value.mean().item():.6f}")
         print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
         print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
         # print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
-        # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
+        print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
-    return (
-        loss_weights["loss_mxy"] * loss_mxy,
-        loss_weights["loss_mz"] * loss_mz,
-        loss_weights["boundary_vals_pulse"] * boundary_vals_pulse,
-        loss_weights["gradient_height_loss"] * gradient_height_loss,
-        loss_weights["pulse_height_loss"] * pulse_height_loss,
-        loss_weights["gradient_diff_loss"] * gradient_diff_loss,
-        loss_weights["phase_loss"] * phase_loss,
-    )
+    return (epoch_losses, where_peaks_are)
 
 
 def load_data(path, mode="inference", device="cpu"):
@@ -402,25 +431,27 @@ def load_data_new(path, mode="inference", device="cpu"):
     from utils_bloch.setup import get_smooth_targets
 
     data_dict = torch.load(path, weights_only=False, map_location=device)
-    # target_z = data_dict["targets"]["target_z"]
-    # target_xy = data_dict["targets"]["target_xy"]
+    target_z = data_dict["targets"]["target_z"]
+    target_xy = data_dict["targets"]["target_xy"]
     epoch = data_dict["epoch"]
     losses = data_dict["losses"]
     model = data_dict["model"]
     optimizer = data_dict["optimizer"]
-    # fixed_inputs = data_dict["fixed_inputs"]
+    fixed_inputs = data_dict["fixed_inputs"]
     flip_angle = data_dict["flip_angle"]
     loss_metric = data_dict["loss_metric"]
     scanner_params = data_dict["scanner_params"]
     loss_weights = data_dict["loss_weights"]
     fixed_inputs = params.get_fixed_inputs(tfactor=params.tfactor, n_b0_values=params.n_b0_values, Nz=params.Nz, Nt=params.Nt)
-    target_z, target_xy, slice_centers, half_width = get_smooth_targets(theta=flip_angle, smoothness=2.0, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"])
+    target_z, target_xy, slice_centers, half_width = get_smooth_targets(
+        theta=flip_angle, smoothness=params.target_smoothness, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"], n_b0_values=data_dict["n_b0_values"]
+    )
 
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
-        return pulse, gradient, target_z, target_xy, fixed_inputs
-    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
+        return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, fixed_inputs
+    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, model_args, epoch
 
 
 def load_data_legacy(path, mode="inference"):
@@ -581,7 +612,7 @@ def train(
             device=device,
         )
 
-    infoscreen = InfoScreen(output_every=plot_loss_freq)
+    infoscreen = InfoScreen(output_every=plot_loss_freq, losses=losses)
     trainLogger = TrainLogger(
         fixed_inputs,
         flip_angle,
@@ -612,15 +643,7 @@ def train(
             dt=fixed_inputs["dt_num"],
             time_loop="complex",
         )
-        (
-            loss_mxy,
-            loss_mz,
-            boundary_vals_pulse,
-            gradient_height_loss,
-            pulse_height_loss,
-            gradient_diff_loss,
-            phase_loss,
-        ) = loss_fn(
+        (currentLosses, where_slices_are) = loss_fn(
             fixed_inputs["pos"],
             mz,
             mxy,
@@ -634,12 +657,14 @@ def train(
             metric=loss_metric,
             verbose=True,
         )
-        loss = loss_mxy + loss_mz + gradient_height_loss + gradient_diff_loss + pulse_height_loss + boundary_vals_pulse + phase_loss
+        currentLoss = sum(currentLosses.values())
 
-        lossItem = loss.item()
-        losses.append(lossItem)
+        currentLossItems = {key: value.item() for key, value in currentLosses.items()}
+        currentLossItems["total"] = currentLoss.item()
+        for key, value in currentLossItems.items():
+            losses[key].append(value)
         optimizer.zero_grad()
-        loss.backward()
+        currentLoss.backward()
         if suppress_loss_peaks:
             # model = regularize_model_gradients(model)
             if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
@@ -649,8 +674,8 @@ def train(
                 print("Loss peak detected, reloading model and reducing learning rate.")
                 continue
         optimizer.step()
-        scheduler.step(lossItem)
+        scheduler.step(currentLossItems["total"])
 
-        new_optimum = trainLogger.log_epoch(epoch, loss, losses, model, optimizer, pulse, gradient)
-        infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum)
-        infoscreen.print_info(epoch, lossItem, optimizer, trainLogger.best_loss)
+        new_optimum = trainLogger.log_epoch(epoch, losses, model, optimizer)
+        infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, new_optimum, where_slices_are)
+        infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
