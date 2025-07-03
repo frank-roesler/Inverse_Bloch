@@ -142,7 +142,7 @@ class SIREN(PulseGradientBase):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim))
         self.final_layer = nn.Linear(hidden_dim, output_dim)
         init.uniform_(self.final_layer.weight, a=-initial_weight_bound, b=initial_weight_bound)
-        init.uniform_(self.final_layer.bias, a=4 * initial_weight_bound, b=5 * initial_weight_bound)
+        init.uniform_(self.final_layer.bias, a=-initial_weight_bound, b=initial_weight_bound)
 
     def forward(self, x):
         x_orig = x.clone()

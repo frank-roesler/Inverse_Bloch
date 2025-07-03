@@ -84,7 +84,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
     from utils_train.utils import move_to
     from utils_bloch.setup import get_smooth_targets
 
-    target_z, target_xy, slice_centers, half_width = get_smooth_targets(
+    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
         theta=params.flip_angle, smoothness=params.target_smoothness, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"], n_b0_values=n_values
     )
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
@@ -118,19 +118,20 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
         phasemax = -np.inf
 
         phase_means = []
-        for i, c in enumerate(slice_centers):
-            phase_loc = phase[c - half_width : c + half_width]
-            phasemin = np.min([phasemin, np.min(phase_loc)])
-            phasemax = np.max([phasemax, np.max(phase_loc)])
-            phase_mean_slice = np.mean(phase_loc)
-            phase_means.append(phase_mean_slice)
-            print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-        if len(phase_means) > 1:
-            print(
-                "Difference:",
-                f"{(phase_means[1] - phase_means[0])%2*np.pi:.2f} radians; ",
-                f"{(phase_means[1] - phase_means[0])/2/np.pi*360%360:.2f} degrees",
-            )
+        for slice_centers in slice_centers_allB0:
+            for i, c in enumerate(slice_centers):
+                phase_loc = phase[c - half_width : c + half_width]
+                phasemin = np.min([phasemin, np.min(phase_loc)])
+                phasemax = np.max([phasemax, np.max(phase_loc)])
+                phase_mean_slice = np.mean(phase_loc)
+                phase_means.append(phase_mean_slice)
+                print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
+            if len(phase_means) > 1:
+                print(
+                    "Difference:",
+                    f"{(phase_means[1] - phase_means[0])%(2*np.pi):.2f} radians; ",
+                    f"{((phase_means[1] - phase_means[0])/2/np.pi*360)%360:.2f} degrees",
+                )
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 

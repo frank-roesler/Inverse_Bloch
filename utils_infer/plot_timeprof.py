@@ -7,11 +7,11 @@ import os
 
 def plot_timeprof(gamma, B1, G, fixed_inputs, slice_centers, path=None, fig=None, ax=None):
     mxy, mz = blochsim_CK_timeprofile(gamma, B1, G, fixed_inputs["pos"], fixed_inputs["sens"], fixed_inputs["B0_list"], fixed_inputs["M0"], fixed_inputs["dt_num"])
-    cmap = cm.get_cmap("inferno", len(slice_centers) + 2)
-    colors = [cmap(i + 1) for i in range(len(slice_centers))]
+    cmap = cm.get_cmap("inferno", len(slice_centers[0]) + 2)
+    colors = [cmap(i + 1) for i in range(len(slice_centers[0]))]
     if ax == None or fig == None:
         fig, ax = plt.subplots(figsize=(12, 6))
-    for i, c in enumerate(slice_centers):
+    for i, c in enumerate(slice_centers[0]):
         color = colors[i]
         timeprof = torch.abs(mxy[0, c, :])
 

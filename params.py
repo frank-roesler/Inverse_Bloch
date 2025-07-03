@@ -5,11 +5,11 @@ import numpy as np
 # TRAINING PARAMETERS:
 start_epoch = 0
 target_smoothness = 4.0
-epochs = 30000
+epochs = 50000
 resume_from_path = None  # "results/train_log.pt"  # path to resume training from
-lr = {"pulse": 5e-5, "gradient": 5e-5}  # learning rate
+lr = {"pulse": 2e-5, "gradient": 2e-5}  # learning rate
 plot_loss_frequency = 100  # plot every n steps
-start_logging = 1000  # start logging after n steps
+start_logging = 10  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 suppress_loss_peaks = False  # detect peaks in loss function and reduce lr
 loss_metric = "L1"
@@ -18,25 +18,26 @@ loss_weights = {
     "loss_mz": 1.0,
     "boundary_vals_pulse": 100.0,
     "gradient_height_loss": 0.1,
-    "pulse_height_loss": 100.0,
+    "pulse_height_loss": 1000.0,
     "gradient_diff_loss": 1.0,
-    "phase_loss": 10.0,
+    "phase_loss": 1.0,
 }
 
 # BLOCH PARAMETERS:
 n_slices = 2
-n_b0_values = 3
+n_b0_values = 5
 flip_angle = 0.5 * np.pi
 tfactor = 2  # pulse time is 0.64ms * tfactor
-Nz = 512  # number of mesh points in pos axis
+Nz = 128  # number of mesh points in pos axis
 Nt = 64  # number of mesh points per 0.64ms time interval
-fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing="nonlinear")
+pos_spacing = "nonlinear"  # "nonlinear" places more mesh points in the center
+fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing=pos_spacing)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
 model_args = {
     "n_coeffs": 40,  # Fourier Series
-    "omega_0": 45,  # SIREN
+    "omega_0": 43,  # SIREN
     "bandwidth": 101,  # ModulatedFourier
     "hidden_dim": 32,  # MLP, SIREN, ModulatedFourier
     "num_layers": 16,  # MLP, SIREN
@@ -45,7 +46,7 @@ model_args = {
     "num_fourier_features": 51,  # FourierMLP
     "frequency_scale": 100.0,  # FourierMLP
     "tvector": fixed_inputs["t_B1"][:, 0],  # NoModel
-    "gradient_scale": 10.0,  # relative size of gradient to RF pulse
+    "gradient_scale": 20.0,  # relative size of gradient to RF pulse
     "positive_gradient": True,
     "tmin": fixed_inputs["t_B1"][0].item(),
     "tmax": fixed_inputs["t_B1"][-1].item(),

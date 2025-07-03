@@ -1,3 +1,4 @@
 from utils_infer.plot_off_resonance import plot_off_resonance, plot_some_b0_values
 from utils_infer.plot_timeprof import plot_timeprof
 from utils_infer.fit_line_to_phase import fit_line_to_phase, plot_fit_error, simulate_B0_values
+from utils_infer.export_param_csv import export_param_csv

@@ -105,32 +105,35 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
 
     width = 0.02
     distance = 0.01
-    left = -0.5 * (width * n_targets + distance * (n_targets - 1))
-
+    shift = 0.002
     pos0 = np.argmin(np.abs(pos)).item()
     posAtWidth = np.argmin(np.abs(pos - width / 2)).item()
     half_width = posAtWidth - pos0
 
-    target_xy = torch.zeros(pos.shape, dtype=torch.float32, requires_grad=False)
+    targets_xy = []
     centers = []
-    for i in range(n_targets):
-        target_xy += smooth_square_well(
-            pos,
-            left=left,
-            right=left + width,
-            depth=np.sin(theta),
-            smoothness=smoothness,
-            function=function,
-        )
-        centers.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
-        left += width + distance
-
-    targets = []
     minShift = n_b0_values // 2
     for i in range(-minShift, minShift + 1):
-        shift = 0  # pos.shape[0] // 100 * i
-        targets.append(circshift(target_xy, shift))
-    target_xy = torch.stack(targets, dim=0)
+
+        left = -0.5 * (width * n_targets + distance * (n_targets - 1)) - i * shift
+
+        target_xy = torch.zeros(pos.shape, dtype=torch.float32, requires_grad=False)
+        centers_loc = []
+        for i in range(n_targets):
+            target_xy += smooth_square_well(
+                pos,
+                left=left,
+                right=left + width,
+                depth=np.sin(theta),
+                smoothness=smoothness,
+                function=function,
+            )
+            centers_loc.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
+            left += width + distance
+
+        targets_xy.append(target_xy)
+        centers.append(centers_loc)
+    target_xy = torch.stack(targets_xy, dim=0)
     target_z = torch.sqrt(1 - target_xy**2)
     return target_z, target_xy, centers, half_width
 

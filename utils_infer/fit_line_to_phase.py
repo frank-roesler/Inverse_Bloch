@@ -20,16 +20,17 @@ def simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3):
 
 
 def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
-    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3)
+    n_slices = len(centers[0])
+    n_b0_values = len(centers)
+    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
     fitted_lines = []
     phases = []
     for ff in range(mxy.shape[0]):
         phase = np.unwrap(np.angle(mxy[ff, :]))
-        n_slices = len(centers)
         fitted_line = np.zeros_like(phase)
 
         for i in range(n_slices):
-            center = centers[i]
+            center = centers[ff][i]
             start = max(center - half_width, 0)
             end = min(center + half_width, len(phase) - 1)
 
@@ -45,15 +46,16 @@ def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
     return fitted_lines, phases
 
 
-def plot_fit_error(fixed_inputs, B1, G, centers, half_width, path=None):
-    fitted_lines, phases = fit_line_to_phase(fixed_inputs, B1, G, centers, half_width)
-    where_slices_are = np.zeros_like(phases[0])
-    for center in centers:
-        where_slices_are[center - half_width : center + half_width] = 1
+def plot_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
+    fitted_lines, phases = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width)
+    where_slices_are = np.zeros((len(centers_allB0), phases[0].shape[0]))
+    for i, centers in enumerate(centers_allB0):
+        for center in centers:
+            where_slices_are[i, center - half_width : center + half_width] = 1
     fig, ax = plt.subplots(figsize=(10, 5))
     for i, fitted_line in enumerate(fitted_lines):
         error = phases[i] - fitted_line
-        error[~where_slices_are.astype(bool)] = np.nan
+        error[~where_slices_are[i].astype(bool)] = np.nan
         plt.plot(fixed_inputs["pos"], error, linewidth=0.8)
     plt.title("Phase Fitting and Error")
     plt.xlabel("pos")
