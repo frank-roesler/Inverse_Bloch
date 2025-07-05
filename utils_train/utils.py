@@ -331,6 +331,92 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
+def compute_profile_loss(xy_profile, z_profile, target_xy, target_z, metric):
+    """Computes approximation error between slice profile and target in L1 or L2 norm"""
+    xy_profile_abs = torch.abs(xy_profile)
+    if metric == "L2":
+        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).mean(dim=0)
+        loss_mz = torch.mean((z_profile - target_z) ** 2).mean(dim=0)
+        # if loss_mxy < 0.04:
+        #     where_peaks_are = xy_profile_abs > 0.5
+    elif metric == "L1":
+        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).mean(dim=0)
+        loss_mz = torch.mean(torch.abs(z_profile - target_z)).mean(dim=0)
+        # if loss_mxy < 0.11:
+        #     where_peaks_are = xy_profile_abs > 0.5
+    else:
+        raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
+    return loss_mxy, loss_mz
+
+
+def compute_boundary_loss(pulse):
+    """Penalizes boundary values of the pulse at start and end"""
+    boundary_vals_pulse = threshold_loss((torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2), 1e-11).mean(dim=0)
+    return boundary_vals_pulse
+
+
+def compute_gradient_height_loss(gradient, threshold):
+    """Penalizes maximum height of the gradient"""
+    gradient_height_loss = threshold_loss(gradient, threshold).mean(dim=0)
+    return gradient_height_loss
+
+
+def compute_gradient_diff_loss(gradient, threshold):
+    """Penalizes large slope of the gradient (in time)"""
+    if gradient.shape[0] > 1:
+        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), threshold).mean(dim=0)
+    else:
+        gradient_diff_loss = torch.zeros(1, device=gradient.device)
+    return gradient_diff_loss
+
+
+def compute_pulse_height_loss(pulse, threshold):
+    """Penalizes large pulse amplitude (to avoid SAR)"""
+    pulse_height_loss = threshold_loss(pulse, threshold).mean(dim=0)
+    return pulse_height_loss
+
+
+def compute_phase_ddiff_loss(phase, where_peaks_are, posAx):
+    """Enforces linearity of phase on slices"""
+    dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
+    phase_diff = torch.diff(phase) / dx
+    phase_ddiff = torch.diff(phase_diff) / dx
+    phase_ddiff = torch.mean(phase_ddiff[where_peaks_are[:, 1:-1]] ** 2, dim=-1)
+    return phase_diff, phase_ddiff
+
+
+def compute_phase_diff_var_loss(phase_diff, where_peaks_are):
+    """Enforces equal slope pf phase in all slices"""
+    phase_diff_var = torch.var(phase_diff[where_peaks_are[:, :-1]], dim=-1)
+    return phase_diff_var
+
+
+def compute_phase_B0_diff(phase):
+    """When training multiple B0 values at once, this loss penalizes large variation of the phase in B0 direction"""
+    phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)
+    return phase_B0_diff
+
+
+def compute_phase_left_right_loss(phase, where_peaks_are, posAx):
+    """Enforces phase offset of 180º between slices. Only works with 2 slices"""
+    left = torch.zeros_like(where_peaks_are)
+    left[:, posAx < 0] = 1
+    right = ~left
+    leftPeak = where_peaks_are * left
+    rightPeak = where_peaks_are * right
+    phase_left = (phase * leftPeak).mean(dim=-1)
+    phase_right = (phase * rightPeak).mean(dim=-1)
+    phase_left_right = torch.abs(phase_left - phase_right) % np.pi
+    phase_left_right = 0.1 * (phase_left_right - np.pi) ** 2
+    return phase_left_right
+
+
+def compute_phase_diff_loss(phase_diff, where_peaks_are):
+    """Penalizes slope of phase on slices. Thereby enforces self-refocusoing"""
+    phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
+    return phase_diff_loss
+
+
 def loss_fn(
     posAx,
     z_profile,
@@ -346,45 +432,18 @@ def loss_fn(
     verbose=False,
 ):
     where_peaks_are = target_xy > 1e-3
-    xy_profile_abs = torch.abs(xy_profile)
-    if metric == "L2":
-        loss_mxy = torch.mean((xy_profile_abs - target_xy) ** 2).mean(dim=0)
-        loss_mz = torch.mean((z_profile - target_z) ** 2).mean(dim=0)
-        # if loss_mxy < 0.04:
-        #     where_peaks_are = xy_profile_abs > 0.5
-    elif metric == "L1":
-        loss_mxy = torch.mean(torch.abs(xy_profile_abs - target_xy)).mean(dim=0)
-        loss_mz = torch.mean(torch.abs(z_profile - target_z)).mean(dim=0)
-        # if loss_mxy < 0.11:
-        #     where_peaks_are = xy_profile_abs > 0.5
-    else:
-        raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
-    boundary_vals_pulse = threshold_loss((torch.abs(pulse[0]) ** 2 + torch.abs(pulse[-1]) ** 2), 1e-11).mean(dim=0)
-    gradient_height_loss = threshold_loss(gradient, scanner_params["max_gradient"]).mean(dim=0)
-    pulse_height_loss = threshold_loss(pulse, scanner_params["max_pulse_amplitude"]).mean(dim=0)
-    if gradient.shape[0] > 1:
-        gradient_diff_loss = threshold_loss(torch.diff(gradient.squeeze()), scanner_params["max_diff_gradient"] * delta_t * 1000).mean(dim=0)
-    else:
-        gradient_diff_loss = torch.zeros(1, device=z_profile.device)
+    loss_mxy, loss_mz = compute_profile_loss(xy_profile, z_profile, target_xy, target_z, metric)
+    boundary_vals_pulse = compute_boundary_loss(pulse)
+    gradient_height_loss = compute_gradient_height_loss(gradient, scanner_params["max_gradient"])
+    pulse_height_loss = compute_pulse_height_loss(pulse, scanner_params["max_pulse_amplitude"])
+    gradient_diff_loss = compute_phase_ddiff_loss(gradient, scanner_params["max_diff_gradient"] * delta_t * 1000)
+
     phase = torch_unwrap(torch.angle(xy_profile))
-    dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
-    phase_diff = torch.diff(phase) / dx
-    phase_ddiff = torch.diff(phase_diff) / dx
-    phase_ddiff = torch.mean(phase_ddiff[where_peaks_are[:, 1:-1]] ** 2, dim=-1)
-    phase_diff_var = torch.var(phase_diff[where_peaks_are[:, :-1]], dim=-1)
-    # phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
-
-    # left = torch.zeros_like(where_peaks_are)
-    # left[:, posAx < 0] = 1
-    # right = ~left
-    # leftPeak = where_peaks_are * left
-    # rightPeak = where_peaks_are * right
-    # phase_left = (phase * leftPeak).mean(dim=-1)
-    # phase_right = (phase * rightPeak).mean(dim=-1)
-    # phase_left_right = torch.abs(phase_left - phase_right) % np.pi
-    # phase_left_right = 0.1 * (phase_left_right - np.pi / 2) ** 2  # only works with 2 slices
-
-    phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)  # B0 phase difference
+    phase_diff, phase_ddiff = compute_phase_ddiff_loss(phase, where_peaks_are, posAx)
+    phase_diff_var = compute_phase_diff_var_loss(phase_diff, where_peaks_are)
+    phase_B0_diff = compute_phase_B0_diff(phase)
+    # phase_left_right = compute_phase_left_right_loss(phase, where_peaks_are, posAx)
+    # phase_diff_loss = compute_phase_diff_loss(phase_diff, where_peaks_are)
 
     epoch_losses = {
         "loss_mxy": loss_weights["loss_mxy"] * loss_mxy,
@@ -403,10 +462,6 @@ def loss_fn(
         print("LOSSES:")
         for key, value in epoch_losses.items():
             print(f"{key}: {value.mean().item():.6f}")
-        # print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
-        # print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
-        # print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
-        # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
         print("-" * 50)
     return (epoch_losses, where_peaks_are)
 
@@ -694,4 +749,5 @@ def train(
 
     from forward import forward
 
-    forward(trainLogger.export_loc, npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512)
+    if os.path.exists(trainLogger.export_loc):
+        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512)
