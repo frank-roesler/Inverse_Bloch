@@ -5,7 +5,7 @@ import numpy as np
 # TRAINING PARAMETERS:
 start_epoch = 0
 target_smoothness = 4.0
-shift_targets = False
+shift_targets = True
 epochs = 50000
 resume_from_path = None  # "results/2025-07-04_15-31/train_log.pt"  # path to resume training from
 lr = {"pulse": 1e-5, "gradient": 1e-5}  # learning rate
