@@ -14,13 +14,9 @@ def plot_timeprof(gamma, B1, G, fixed_inputs, slice_centers, path=None, fig=None
     for i, c in enumerate(slice_centers[0]):
         color = colors[i]
         timeprof = torch.abs(mxy[0, c, :])
-
-        # t_B1_centers = 0.5 * (t_B1[:-1] + t_B1[1:])
         com = timeprof[-1] - torch.sum(timeprof)
         com = int(com.item())
-
         ax.plot(fixed_inputs["t_B1"], timeprof, linewidth=0.9, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color)
-        # plt.plot(fixed_inputs['t_B1_centers'], timeprof_diff, linewidth=0.8, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color)
         ax.plot(fixed_inputs["t_B1"][com], timeprof[com], "o", color=color)
     plt.legend()
     if path is not None:

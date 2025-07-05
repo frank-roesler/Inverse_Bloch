@@ -46,7 +46,7 @@ def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
     return fitted_lines, phases
 
 
-def plot_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
+def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
     fitted_lines, phases = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width)
     where_slices_are = np.zeros((len(centers_allB0), phases[0].shape[0]))
     for i, centers in enumerate(centers_allB0):

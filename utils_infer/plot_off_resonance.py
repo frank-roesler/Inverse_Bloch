@@ -4,9 +4,14 @@ from torch import linspace, squeeze, angle
 import os
 
 
-def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block=False):
-    from params import flip_angle
-
+def plot_off_resonance(
+    rf,
+    grad,
+    fixed_inputs,
+    freq_offsets_Hz,
+    flip_angle,
+    path=None,
+):
     npts = len(freq_offsets_Hz)
     pos = fixed_inputs["pos"].detach().cpu()
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(
@@ -86,20 +91,24 @@ def plot_some_b0_values(
     G,
     B1,
     flip_angle,
+    target_smoothness,
+    n_slices,
+    shift_targets,
     path=None,
 ):
     from utils_train.utils import move_to
     from utils_bloch.setup import get_smooth_targets
 
     target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
-        theta=params.flip_angle,
-        smoothness=params.target_smoothness,
+        theta=flip_angle,
+        smoothness=target_smoothness,
         function=torch.sigmoid,
-        n_targets=params.n_slices,
+        n_targets=n_slices,
         pos=fixed_inputs["pos"],
         n_b0_values=n_values,
-        shift_targets=params.shift_targets,
+        shift_targets=shift_targets,
     )
+
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
     pos = fixed_inputs["pos"]

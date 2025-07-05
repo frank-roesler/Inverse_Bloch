@@ -691,3 +691,7 @@ def train(
         trainLogger.log_epoch(epoch, losses, model, optimizer)
         infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, where_slices_are)
         infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
+
+    from forward import forward
+
+    forward(trainLogger.export_loc, npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512)
