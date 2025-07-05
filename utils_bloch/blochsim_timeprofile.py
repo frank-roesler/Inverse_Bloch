@@ -3,7 +3,7 @@ import torch
 from utils_bloch.simulation_utils import *
 
 
-def blochsim_CK_timeprofile(gam, B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
+def blochsim_CK_timeprofile(B1, G, pos, sens, B0_list, M0, dt=6.4e-6, **kwargs):
     gam, Nb, Ns, Nt, bxy, bz = setup_simulation(G, pos, sens, B0_list, B1)
 
     alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
