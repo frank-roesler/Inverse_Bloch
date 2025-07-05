@@ -1,48 +1,38 @@
-from utils_bloch.blochsim_batch import blochsim_CK_batch
-from utils_bloch.setup import get_targets
+from utils_bloch.setup import *
 from utils_train.utils import *
-import numpy as np
 from params import *
-import matplotlib.pyplot as plt
-from utils_bloch.blochsim_CK_freqprof import plot_off_resonance
-from time import time
+from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error, export_param_csv
 
-path = "results/280425_Mixed_square_flipAngle45/train_log.pt"
 
-target_z, target_xy = get_targets(flip_angle)
+def forward(path, npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512):
+    (model, B1, G, target_z, target_xy, slice_centers_allB0, half_width, fixed_inputs) = load_data(path, mode="inference")
 
-# B1 = torch.from_numpy(inputs["rfmb"]).to(torch.complex64)
-# G = torch.from_numpy(inputs["Gs"]).to(torch.float32)
-B1, G = load_data(path)
+    n_b0_values = len(slice_centers_allB0)
+    fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing="linear")
 
-npts = 8
-gam = 267522.1199722082
-gam_hz_mt = gam / (2 * np.pi)
-freq_offsets_Hz = torch.linspace(-8000, 8000, npts)
+    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
+        theta=flip_angle,
+        smoothness=target_smoothness,
+        function=torch.sigmoid,
+        n_targets=n_slices,
+        pos=fixed_inputs["pos"],
+        n_b0_values=n_b0_values,
+        shift_targets=shift_targets,
+    )
+    B1, G = model(fixed_inputs["t_B1"])
 
-t0 = time()
-plot_off_resonance(
-    B1.numpy(), G.numpy(), pos.numpy(), sens.numpy(), dt, B0=B0.numpy(), M0=M0.numpy(), freq_offsets_Hz=freq_offsets_Hz
-)
-print("Time:", time() - t0)
+    print("PULS AMPLITUDE:", torch.max(torch.abs(B1)).item())
 
-# B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
-# B0_list = []
-# for ff in range(len(freq_offsets_Hz)):
-#     B0_list.append(B0 + B0_freq_offsets_mT[ff])
+    freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
+    with torch.no_grad():
+        # export_param_csv(path, path)
+        # plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, flip_angle, target_smoothness, n_slices, shift_targets, path=path)
+        plot_timeprof(B1, G, fixed_inputs, slice_centers_allB0, half_width, path=path)
+        # plot_phase_fit_error(fixed_inputs, B1, G, slice_centers_allB0, half_width, path=path)
+        # plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=flip_angle, path=path)
+    plt.show()
 
-# B0 = torch.stack(B0_list, dim=0).to(torch.float32)
-# print(B0.shape)
-# mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=sens, B0_list=B0, M0=M0, dt=dt)
-# for ff in range(npts):
-#     fig, ax = plt.subplots(2, 2, figsize=(12, 6))
-#     ax[0, 0].plot(t_B1, np.real(B1), linewidth=0.8)
-#     ax[0, 0].plot(t_B1, np.imag(B1), linewidth=0.8)
-#     ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
-#     ax[0, 1].plot(t_B1, G, linewidth=0.8)
-#     ax[1, 0].plot(pos[:, 2], np.real(mz[ff, :].detach().cpu().numpy()), linewidth=0.8)
-#     ax[1, 0].plot(pos[:, 2], target_z, linewidth=0.8)
-#     ax[1, 1].plot(pos[:, 2], np.abs(mxy[ff, :].detach().cpu().numpy()), linewidth=0.8)
-#     ax[1, 1].plot(pos[:, 2], target_xy, linewidth=0.8)
-#     # plt.savefig("forward.png", dpi=300)
-#     plt.show()
+
+if __name__ == "__main__":
+    path = "results/Pulse_Comparison_0725/300625_Mixed_2Slice_phaseOffset200/train_log.pt"
+    forward(path, npts_some_b0_values=7, Nz=1024, Nt=256, npts_off_resonance=512)
