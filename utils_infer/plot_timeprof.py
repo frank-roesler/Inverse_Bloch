@@ -16,7 +16,7 @@ def plot_timeprof(B1, G, fixed_inputs, slice_centers, half_width, path=None):
             timeprof = torch.mean(torch.abs(mxy[b, c - half_width : c + half_width, :]), dim=0)
             com = timeprof[-1] - torch.sum(timeprof)
             com = int(com.item())
-            ax.plot(fixed_inputs["t_B1"], timeprof, linewidth=0.9, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.2f}", color=color)
+            ax.plot(fixed_inputs["t_B1"], timeprof, linewidth=0.9, label=f"Slice: {i+1}\ncenter of mass: {fixed_inputs['t_B1'][com].item():.3f}", color=color)
             ax.plot(fixed_inputs["t_B1"][com], timeprof[com], "o", color=color)
         plt.legend()
         if path is not None:

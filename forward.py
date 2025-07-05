@@ -34,5 +34,5 @@ def forward(path, npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512
 
 
 if __name__ == "__main__":
-    path = "results/2025-07-04_15-38/train_log.pt"
+    path = "results/Pulse_Comparison_0725/300625_Mixed_2Slice_phaseOffset200/train_log.pt"
     forward(path, npts_some_b0_values=7, Nz=1024, Nt=256, npts_off_resonance=512)

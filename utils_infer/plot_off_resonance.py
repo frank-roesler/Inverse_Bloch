@@ -151,10 +151,10 @@ def plot_some_b0_values(
                 phasemax = np.max([phasemax, np.max(phase_loc)])
                 phase_mean_slice = np.mean(phase_loc)
                 phase_means.append(phase_mean_slice)
-                print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
+                # print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
             if len(phase_means) > 1:
                 print(
-                    "Difference:",
+                    "Phase Difference:",
                     f"{(phase_means[1] - phase_means[0])%(2*np.pi):.2f} radians; ",
                     f"{((phase_means[1] - phase_means[0])/2/np.pi*360)%360:.2f} degrees",
                 )
