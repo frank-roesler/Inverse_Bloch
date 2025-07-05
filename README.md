@@ -22,7 +22,6 @@ This repository provides tools for training, simulating, and analyzing RF pulse 
 - **forward.py**: Run inference with a trained model, generate and plot results.
 - **backward.py**: Main training script for neural network models.
 - **params.py**: Central configuration for training and simulation parameters.
-- **tests.py**: (Commented) Example/test code for model and simulation routines.
 - **requirements.txt**: Python dependencies.
 - **README.md**: Project overview and instructions (this file).
 
