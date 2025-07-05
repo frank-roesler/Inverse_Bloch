@@ -10,6 +10,7 @@ This repository contains a Python package (under development) that uses neural n
 
 This procedure yields pulse/gradient pairs, which approximate the prescribed targets. Further constraints (e.g. on the slope of `gradient` or the phase of $M_{xy}$ can be prescribed by modifying the loss function accordingly.
 
+![Example image of training process.](https://myoctocat.com/assets/images/base-octocat.svg)
 ---
 
 # Inverse Bloch Simulation and Training Suite
@@ -79,9 +80,6 @@ export_param_csv(input_path, output_path)
 
 ## Author
 Frank Rösler
-
-## License
-[Specify your license here]
 
 ---
 For more details, see code comments and docstrings in each module.
