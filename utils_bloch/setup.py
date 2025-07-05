@@ -98,14 +98,14 @@ def circshift(x, shift):
     return torch.cat((x[-shift:], x[:-shift]))
 
 
-def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1, pos=torch.linspace(-0.18, 0.18, 4096), n_b0_values=1):
+def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_targets=1, pos=torch.linspace(-0.18, 0.18, 4096), n_b0_values=1, shift_targets=False):
     """higher smoothness values give sharper transitions"""
 
     smoothness *= 1000.0
 
     width = 0.02
     distance = 0.01
-    shift = 0.002
+    shift = 0.002 if shift_targets else 0.0
     pos0 = np.argmin(np.abs(pos)).item()
     posAtWidth = np.argmin(np.abs(pos - width / 2)).item()
     half_width = posAtWidth - pos0

@@ -7,7 +7,9 @@ from params import *
 # device = get_device()
 device = torch.device("cpu")
 
-target_z, target_xy, _, _ = get_smooth_targets(theta=flip_angle, smoothness=target_smoothness, function=torch.sigmoid, n_targets=n_slices, pos=fixed_inputs["pos"], n_b0_values=n_b0_values)
+target_z, target_xy, _, _ = get_smooth_targets(
+    theta=flip_angle, smoothness=target_smoothness, function=torch.sigmoid, n_targets=n_slices, pos=fixed_inputs["pos"], n_b0_values=n_b0_values, shift_targets=shift_targets
+)
 
 model = get_model(modelname, **model_args)
 
@@ -40,6 +42,7 @@ train(
     Nz,
     Nt,
     pos_spacing,
+    shift_targets,
     start_epoch,
     epochs,
     device,

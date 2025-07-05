@@ -80,12 +80,25 @@ def plot_off_resonance(rf, grad, fixed_inputs, freq_offsets_Hz, path=None, block
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
 
 
-def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
+def plot_some_b0_values(
+    n_values,
+    fixed_inputs,
+    G,
+    B1,
+    flip_angle,
+    path=None,
+):
     from utils_train.utils import move_to
     from utils_bloch.setup import get_smooth_targets
 
     target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
-        theta=params.flip_angle, smoothness=params.target_smoothness, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"], n_b0_values=n_values
+        theta=params.flip_angle,
+        smoothness=params.target_smoothness,
+        function=torch.sigmoid,
+        n_targets=params.n_slices,
+        pos=fixed_inputs["pos"],
+        n_b0_values=n_values,
+        shift_targets=params.shift_targets,
     )
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
@@ -102,6 +115,10 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):
         fig, ax = plt.subplots(2, 2, figsize=(14, 6))
+        mxy_abs = np.abs(mxy[ff, :])
+        mxy_argmax = np.argmax(mxy_abs)
+        flip_angle = np.arctan(mxy_abs[mxy_argmax] / mz[ff, mxy_argmax]) / 2 / np.pi * 360
+        print(f"Flip angle for B0 {ff}: {flip_angle:.2f} degrees")
         ax[0, 0].plot(t_B1, np.real(B1), linewidth=0.8)
         ax[0, 0].plot(t_B1, np.imag(B1), linewidth=0.8)
         ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
@@ -110,7 +127,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, path=None):
         ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1)
         ax[1, 0].plot(pos, np.real(mz[ff, :]), linewidth=0.8)
         ax[1, 0].plot(pos, target_z[ff, :], linewidth=0.8)
-        ax[1, 1].plot(pos, np.abs(mxy[ff, :]), linewidth=0.8)
+        ax[1, 1].plot(pos, mxy_abs, linewidth=0.8)
         ax[1, 1].plot(pos, target_xy[ff, :], linewidth=0.8)
 
         phase = np.unwrap(np.angle(mxy[ff, :]))

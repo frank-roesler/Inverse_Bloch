@@ -5,12 +5,11 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import torch
 import numpy as np
-from params import model_args, fixed_inputs, loss_weights, plot_loss_frequency
+from params import model_args, loss_weights
 import os
 import datetime
 import json
-from utils_bloch import blochsim_CK_batch, blochsim_CK_batch_realPulse
-from utils_infer import plot_off_resonance
+from utils_bloch import blochsim_CK_batch
 
 
 class TrainLogger:
@@ -29,6 +28,7 @@ class TrainLogger:
         Nz,
         Nt,
         pos_spacing,
+        shift_targets,
         start_logging=1,
     ):
         self.log = {
@@ -45,6 +45,7 @@ class TrainLogger:
             "Nz": Nz,
             "Nt": Nt,
             "pos_spacing": pos_spacing,
+            "shift_targets": shift_targets,
         }
         self.start_logging = start_logging
         self.best_loss = np.inf
@@ -66,10 +67,11 @@ class TrainLogger:
     def save(self, epoch, losses):
         if not losses["total"][-1] < 0.99 * self.best_loss:
             self.new_optimum = False
+            return
         self.best_loss = losses["total"][-1]
         if epoch <= self.start_logging:
             self.new_optimum = False
-
+            return
         os.makedirs(self.export_loc, exist_ok=True)
         torch.save(self.log, os.path.join(self.export_loc, "train_log.pt"))
         self.export_json()
@@ -154,11 +156,6 @@ class InfoScreen:
 
     def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
         """plots info curves during training"""
-        # if epoch % 1000 == 0 and epoch > 0:
-        #     freq_offsets_Hz = torch.linspace(-8000, 8000, 64)
-        #     plot_off_resonance(pulse + 0j, gradient, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz)
-        #     plt.show(block=False)
-
         if epoch % self.output_every == 0 or trainlogger.new_optimum:
             pos = pos.cpu()
             fmin = torch.min(pos).item()
@@ -186,19 +183,14 @@ class InfoScreen:
             for collection in self.ax_phase.collections:
                 collection.remove()
 
-            # self.target_z_plot.set_xdata(pos)
-            # self.target_xy_plot.set_xdata(pos)
             self.grad_plot.set_xdata(t)
             self.pulse_real_plot.set_xdata(t)
             self.pulse_imag_plot.set_xdata(t)
             self.pulse_abs_plot.set_xdata(t)
-            # self.loss_plot.set_xdata(np.arange(len(losses)))
 
             self.add_line_collection(self.ax_bottom_left, pos, mz_plot)
             self.add_line_collection(self.ax_bottom_right, pos, mxy_abs)
             self.add_line_collection(self.ax_phase, pos, phase, linestyle="dotted")
-            # self.target_z_plot.set_ydata(tgt_z[1, :])
-            # self.target_xy_plot.set_ydata(tgt_xy[1, :])
             self.add_line_collection(self.ax_bottom_left, pos, tgt_z, cmap="viridis")
             self.add_line_collection(self.ax_bottom_right, pos, tgt_xy, cmap="viridis")
 
@@ -215,9 +207,8 @@ class InfoScreen:
                     continue
                 currentMin = np.min(losses[key][-2000:])
                 if currentMin > 1e-6:
-                    minLoss = min(minLoss, currentMin)
-                maxLoss = max(maxLoss, np.max(losses[key][-2000:]))
-            # self.loss_plot.set_ydata(losses)
+                    minLoss = 0.5 * min(minLoss, currentMin)
+                maxLoss = 2 * max(maxLoss, np.max(losses[key][-2000:]))
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
             self.ax_bottom_right.set_xlim(fmin, fmax)
@@ -379,7 +370,7 @@ def loss_fn(
     dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
     phase_diff = torch.diff(phase) / dx
     phase_ddiff = torch.diff(phase_diff) / dx
-    phase_ddiff = 100 * torch.mean(phase_ddiff[where_peaks_are[:, 1:-1]] ** 2, dim=-1)
+    phase_ddiff = torch.mean(phase_ddiff[where_peaks_are[:, 1:-1]] ** 2, dim=-1)
     phase_diff_var = torch.var(phase_diff[where_peaks_are[:, :-1]], dim=-1)
     # phase_diff_loss = torch.mean(phase_diff[:, where_peaks_are[:-1]] ** 2, dim=-1)
 
@@ -393,13 +384,7 @@ def loss_fn(
     # phase_left_right = torch.abs(phase_left - phase_right) % np.pi
     # phase_left_right = 0.1 * (phase_left_right - np.pi / 2) ** 2  # only works with 2 slices
 
-    phase_B0_diff = 1e-4 * phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)  # B0 phase difference
-
-    # while phase_left_right > (np.pi) ** 2:
-    #     phase_left_right -= np.pi**2
-    # phase_left_right = 0.1 * (phase_left - phase_right) ** 2  # only works with 2 slices
-
-    phase_loss = (phase_ddiff + phase_diff_var + phase_B0_diff).mean(dim=0)
+    phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)  # B0 phase difference
 
     epoch_losses = {
         "loss_mxy": loss_weights["loss_mxy"] * loss_mxy,
@@ -408,7 +393,9 @@ def loss_fn(
         "gradient_height_loss": loss_weights["gradient_height_loss"] * gradient_height_loss,
         "pulse_height_loss": loss_weights["pulse_height_loss"] * pulse_height_loss,
         "gradient_diff_loss": loss_weights["gradient_diff_loss"] * gradient_diff_loss,
-        "phase_loss": loss_weights["phase_loss"] * phase_loss,
+        "phase_ddiff": loss_weights["phase_ddiff"] * phase_ddiff,
+        "phase_diff_var": loss_weights["phase_diff_var"] * phase_diff_var,
+        "phase_B0_diff": loss_weights["phase_B0_diff"] * phase_B0_diff,
     }
 
     if verbose:
@@ -416,11 +403,10 @@ def loss_fn(
         print("LOSSES:")
         for key, value in epoch_losses.items():
             print(f"{key}: {value.mean().item():.6f}")
-        print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
-        print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
+        # print("phase_diff_var", loss_weights["phase_loss"] * phase_diff_var.mean().item())
+        # print("phase_ddiff", loss_weights["phase_loss"] * phase_ddiff.mean().item())
         # print("phase_diff_loss", loss_weights["phase_loss"] * phase_diff_loss.mean().item())
         # print("phase_left_right", loss_weights["phase_loss"] * phase_left_right.mean().item())
-        print("phase_B0_diff", loss_weights["phase_loss"] * phase_B0_diff.item())
         print("-" * 50)
     return (epoch_losses, where_peaks_are)
 
@@ -452,9 +438,21 @@ def load_data_new(path, mode="inference", device="cpu"):
     scanner_params = data_dict["scanner_params"]
     loss_weights = data_dict["loss_weights"]
     # pos_spacing = data_dict["pos_spacing"]
-    fixed_inputs = params.get_fixed_inputs(tfactor=params.tfactor, n_b0_values=params.n_b0_values, Nz=params.Nz, Nt=params.Nt, pos_spacing=params.pos_spacing)
+    fixed_inputs = params.get_fixed_inputs(
+        tfactor=params.tfactor,
+        n_b0_values=params.n_b0_values,
+        Nz=params.Nz,
+        Nt=params.Nt,
+        pos_spacing=params.pos_spacing,
+    )
     target_z, target_xy, slice_centers, half_width = get_smooth_targets(
-        theta=flip_angle, smoothness=params.target_smoothness, function=torch.sigmoid, n_targets=params.n_slices, pos=fixed_inputs["pos"], n_b0_values=data_dict["n_b0_values"]
+        theta=flip_angle,
+        smoothness=params.target_smoothness,
+        function=torch.sigmoid,
+        n_targets=params.n_slices,
+        pos=fixed_inputs["pos"],
+        n_b0_values=data_dict["n_b0_values"],
+        shift_targets=data_dict["shift_targets"] if "shift_targets" in data_dict else params.shift_targets,
     )
 
     if mode == "inference":
@@ -584,6 +582,7 @@ def train(
     Nz,
     Nt,
     pos_spacing,
+    shift_targets,
     start_epoch,
     epochs,
     device,
@@ -638,6 +637,7 @@ def train(
         Nz,
         Nt,
         pos_spacing,
+        shift_targets,
         start_logging=start_logging,
     )
     for epoch in range(start_epoch, epochs + 1):
