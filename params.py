@@ -7,8 +7,8 @@ start_epoch = 0
 target_smoothness = 4.0
 shift_targets = True
 epochs = 50000
-resume_from_path = None  # "results/2025-07-04_15-31/train_log.pt"  # path to resume training from
-lr = {"pulse": 1e-5, "gradient": 1e-5}  # learning rate
+resume_from_path = None  # "results/2025-07-05_20-10/train_log.pt"  # path to resume training from
+lr = {"pulse": 5e-5, "gradient": 5e-5}  # learning rate
 plot_loss_frequency = 100  # plot every n steps
 start_logging = 1000  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
@@ -21,20 +21,20 @@ loss_weights = {
     "gradient_height_loss": 0.1,
     "pulse_height_loss": 1000.0,
     "gradient_diff_loss": 1.0,
-    "phase_ddiff": 100.0,
-    "phase_diff_var": 1.0,
+    "phase_ddiff": 10.0,
+    "phase_diff_var": 10.0,
     "phase_B0_diff": 1e-8,
 }
 
 # BLOCH PARAMETERS:
-n_slices = 2
-n_b0_values = 5
+n_slices = 4
+n_b0_values = 3
 flip_angle = 0.5 * np.pi
 tfactor = 2  # pulse time is 0.64ms * tfactor
-Nz = 128  # number of mesh points in pos axis
-Nt = 64  # number of mesh points per 0.64ms time interval
+Nz = 256  # number of mesh points in pos axis
+Nt = 128  # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear"  # "nonlinear" places more mesh points in the center
-fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing=pos_spacing)
+fixed_inputs = get_fixed_inputs(tfactor=tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing=pos_spacing, n_slices=n_slices)
 
 # MODEL PARAMETERS:
 modelname = "MixedModel"  # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
@@ -50,7 +50,7 @@ model_args = {
     "frequency_scale": 100.0,  # FourierMLP
     "tvector": fixed_inputs["t_B1"][:, 0],  # NoModel
     "gradient_scale": 20.0,  # relative size of gradient to RF pulse
-    "positive_gradient": False,
+    "positive_gradient": True,
     "tmin": fixed_inputs["t_B1"][0].item(),
     "tmax": fixed_inputs["t_B1"][-1].item(),
 }
@@ -60,5 +60,5 @@ model_args = {
 scanner_params = {
     "max_gradient": 50,  # mT/m
     "max_diff_gradient": 200,  # mT/m/ms
-    "max_pulse_amplitude": 0.028,  # mT
+    "max_pulse_amplitude": 0.04,  # mT
 }

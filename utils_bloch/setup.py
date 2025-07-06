@@ -7,7 +7,7 @@ import numpy as np
 
 
 # BLOCH PARAMETERS:
-def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="linear"):
+def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="linear", n_slices=1):
     gam = 267522.1199722082
     gam_hz_mt = gam / (2 * np.pi)
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
@@ -27,7 +27,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
         u = torch.linspace(-1, 1, Nz)
         pos = abs(u) ** 3
         pos[u < 0] = -pos[u < 0]
-        pos += 0.5 * u
+        pos += 0.5 * n_slices * u
         pos = 2 * 0.18 * pos / (torch.max(pos) - torch.min(pos))
         pos = pos.detach()
     else:
@@ -138,7 +138,7 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     return target_z, target_xy, centers, half_width
 
 
-# fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=512, Nt=64, pos_spacing="nonlinear")
+# fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=128, Nt=64, pos_spacing="nonlinear", n_slices=4)
 # pos = fixed_inputs["pos"]
 # import matplotlib.pyplot as plt
 

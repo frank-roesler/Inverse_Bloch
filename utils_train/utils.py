@@ -52,6 +52,7 @@ class TrainLogger:
         self.loss_weights = loss_weights
         self.export_loc = os.path.join("results", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
         self.new_optimum = False
+        self.t_B1_legacy = self.log["fixed_inputs"]["t_B1_legacy"].to(targets["target_xy"].device)
 
     def log_epoch(self, epoch, losses, model, optimizer):
         self.log["epoch"] = epoch
@@ -59,7 +60,7 @@ class TrainLogger:
         self.log["model"] = model
         self.log["optimizer"] = optimizer
         with torch.no_grad():
-            pulse, gradient = model(self.log["fixed_inputs"]["t_B1_legacy"])
+            pulse, gradient = model(self.t_B1_legacy)
         self.log["pulse"] = pulse.detach().cpu()
         self.log["gradient"] = gradient.detach().cpu()
         self.save(epoch, losses)
@@ -167,6 +168,7 @@ class InfoScreen:
             tgt_xy = target_xy.detach().cpu().numpy()
             pulse_real = np.real(pulse.detach().cpu().numpy())
             pulse_imag = np.imag(pulse.detach().cpu().numpy())
+            where_slices_are = where_slices_are.detach().cpu().numpy()
             pulse_abs = np.sqrt(pulse_real**2 + pulse_imag**2)
             gradient_for_plot = gradient.detach().cpu().numpy()
             phase = np.unwrap(np.angle(mxy.detach().cpu().numpy()), axis=-1)
@@ -436,7 +438,7 @@ def loss_fn(
     boundary_vals_pulse = compute_boundary_loss(pulse)
     gradient_height_loss = compute_gradient_height_loss(gradient, scanner_params["max_gradient"])
     pulse_height_loss = compute_pulse_height_loss(pulse, scanner_params["max_pulse_amplitude"])
-    gradient_diff_loss = compute_phase_ddiff_loss(gradient, scanner_params["max_diff_gradient"] * delta_t * 1000)
+    gradient_diff_loss = compute_gradient_diff_loss(gradient, scanner_params["max_diff_gradient"] * delta_t * 1000)
 
     phase = torch_unwrap(torch.angle(xy_profile))
     phase_diff, phase_ddiff = compute_phase_ddiff_loss(phase, where_peaks_are, posAx)
