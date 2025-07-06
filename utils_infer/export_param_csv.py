@@ -38,7 +38,7 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
         n_targets=data_dict["n_slices"],
         pos=fixed_inputs["pos"],
         n_b0_values=data_dict["n_b0_values"],
-        shift_targets=data_dict["shift_targets"],
+        shift_targets=data_dict["shift_targets"] if "shift_targets" in data_dict else False,
     )
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     phase_offsets_all_b0 = []
