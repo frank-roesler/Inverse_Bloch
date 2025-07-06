@@ -97,6 +97,7 @@ def plot_some_b0_values(
     path=None,
 ):
     from utils_train.utils import move_to
+    from utils_infer import compute_phase_offsets
     from utils_bloch.setup import get_smooth_targets
 
     target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
@@ -142,24 +143,17 @@ def plot_some_b0_values(
         phase = np.unwrap(np.angle(mxy[ff, :]))
         phasemin = np.inf
         phasemax = -np.inf
-
-        phase_means = []
-        for slice_centers in slice_centers_allB0:
-            for i, c in enumerate(slice_centers):
-                phase_loc = phase[c - half_width : c + half_width]
-                phasemin = np.min([phasemin, np.min(phase_loc)])
-                phasemax = np.max([phasemax, np.max(phase_loc)])
-                phase_mean_slice = np.mean(phase_loc)
-                phase_means.append(phase_mean_slice)
-                # print(f"Slice {i+1} phase: {phase_mean_slice:.2f} radians; ", f"{phase_mean_slice/2/np.pi*360:.2f} degrees")
-            if len(phase_means) > 1:
-                print(
-                    "Phase Difference:",
-                    f"{(phase_means[1] - phase_means[0])%(2*np.pi):.2f} radians; ",
-                    f"{((phase_means[1] - phase_means[0])/2/np.pi*360)%360:.2f} degrees",
-                )
+        slice_centers_current_b0 = slice_centers_allB0[ff]
+        for i, c in enumerate(slice_centers_current_b0):
+            phase_loc = phase[c - half_width : c + half_width]
+            phasemin = np.min([phasemin, np.min(phase_loc)])
+            phasemax = np.max([phasemax, np.max(phase_loc)])
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
+
+        phase_offsets_current_b0 = compute_phase_offsets(phase, slice_centers_current_b0, half_width)
+        for p in phase_offsets_current_b0:
+            print(f"Phase offset for B0 {B0[ff]}: {(p/2/np.pi*360)%360:.2f} degrees")
 
         phase[target_xy[ff, :] < 0.5] = np.nan
         ax_phase = ax[1, 1].twinx()

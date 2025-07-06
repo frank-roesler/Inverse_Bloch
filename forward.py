@@ -25,11 +25,11 @@ def forward(path, npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512
 
     freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
     with torch.no_grad():
-        export_param_csv(path, path)
-        plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, flip_angle, target_smoothness, n_slices, shift_targets, path=path)
-        plot_timeprof(B1, G, fixed_inputs, slice_centers_allB0, half_width, path=path)
-        plot_phase_fit_error(fixed_inputs, B1, G, slice_centers_allB0, half_width, path=path)
-        plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=flip_angle, path=path)
+        export_param_csv(path, path, B1, G, fixed_inputs)
+        # plot_some_b0_values(npts_some_b0_values, fixed_inputs, G, B1, flip_angle, target_smoothness, n_slices, shift_targets, path=path)
+        # plot_timeprof(B1, G, fixed_inputs, slice_centers_allB0, half_width, path=path)
+        # plot_phase_fit_error(fixed_inputs, B1, G, slice_centers_allB0, half_width, path=path)
+        # plot_off_resonance(B1 + 0j, G, fixed_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=flip_angle, path=path)
     plt.show()
 
 
