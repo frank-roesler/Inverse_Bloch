@@ -6,11 +6,11 @@ import numpy as np
 start_epoch = 0
 target_smoothness = 4.0
 shift_targets = False
-epochs = 50000
+epochs = 1000
 resume_from_path = None  # "results/2025-07-05_20-10/train_log.pt"  # path to resume training from
 lr = {"pulse": 5e-5, "gradient": 5e-5}  # learning rate
 plot_loss_frequency = 100  # plot every n steps
-start_logging = 1000  # start logging after n steps
+start_logging = 500  # start logging after n steps
 pre_train_inputs = False  # pre-train on given RF-pulse & gradient
 suppress_loss_peaks = False  # detect peaks in loss function and reduce lr
 loss_metric = "L1"
@@ -27,7 +27,7 @@ loss_weights = {
 }
 
 # BLOCH PARAMETERS:
-n_slices = 1
+n_slices = 2
 n_b0_values = 5
 flip_angle = 0.5 * np.pi
 tfactor = 2  # pulse time is 0.64ms * tfactor
@@ -60,5 +60,5 @@ model_args = {
 scanner_params = {
     "max_gradient": 50,  # mT/m
     "max_diff_gradient": 200,  # mT/m/ms
-    "max_pulse_amplitude": 0.01,  # mT
+    "max_pulse_amplitude": 0.02,  # mT
 }
