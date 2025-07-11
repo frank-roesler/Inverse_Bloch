@@ -481,7 +481,8 @@ def load_data_new(path, mode="inference", device="cpu"):
     loss_metric = data_dict["loss_metric"]
     scanner_params = data_dict["scanner_params"]
     loss_weights = data_dict["loss_weights"]
-    # pos_spacing = data_dict["pos_spacing"]
+    n_slices = data_dict["n_slices"]
+    shift_targets = data_dict["shift_targets"] if "shift_targets" in data_dict else params.shift_targets
     fixed_inputs = params.get_fixed_inputs(
         tfactor=params.tfactor,
         n_b0_values=params.n_b0_values,
@@ -493,16 +494,16 @@ def load_data_new(path, mode="inference", device="cpu"):
         theta=flip_angle,
         smoothness=params.target_smoothness,
         function=torch.sigmoid,
-        n_targets=params.n_slices,
+        n_targets=n_slices,
         pos=fixed_inputs["pos"],
         n_b0_values=data_dict["n_b0_values"],
-        shift_targets=data_dict["shift_targets"] if "shift_targets" in data_dict else params.shift_targets,
+        shift_targets=shift_targets,
     )
 
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
-        return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, fixed_inputs
+        return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, shift_targets, n_slices, fixed_inputs
     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, model_args, epoch
 
 

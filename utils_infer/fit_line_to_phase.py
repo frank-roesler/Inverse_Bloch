@@ -28,18 +28,20 @@ def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
     for ff in range(mxy.shape[0]):
         phase = np.unwrap(np.angle(mxy[ff, :]))
         fitted_line = np.zeros_like(phase)
-
+        allPhases = np.zeros((2 * half_width + 1))
+        x = np.arange(-half_width, half_width + 1, dtype=np.float32)
         for i in range(n_slices):
             center = centers[ff][i]
             start = max(center - half_width, 0)
             end = min(center + half_width, len(phase) - 1)
+            allPhases += phase[start : end + 1] - np.mean(phase[start : end + 1])
 
-            x = np.arange(start, end + 1, dtype=np.float32)
-            y = phase[start : end + 1]
-
-            if len(x) > 1:
-                slope, intercept = np.polyfit(x, y, 1)
-                fitted_line[start : end + 1] = slope * x + intercept
+        slope, intercept = np.polyfit(x, allPhases / n_slices, 1)
+        for i in range(n_slices):
+            center = centers[ff][i]
+            start = max(center - half_width, 0)
+            end = min(center + half_width, len(phase) - 1)
+            fitted_line[start : end + 1] = slope * x + np.mean(phase[start : end + 1])
         fitted_lines.append(fitted_line)
         phases.append(phase)
 
