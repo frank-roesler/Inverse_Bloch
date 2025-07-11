@@ -53,7 +53,7 @@ def writerow_if_present(writer, key, input_dict):
         writer.writerow([key, input_dict[key]])
 
 
-def export_param_csv(input_path, output_path, B1, G, fixed_inputs):
+def export_param_csv(input_path, output_path, B1, G, fixed_inputs, slopes):
     data_dict = torch.load(input_path, weights_only=False)
     with open(join(dirname(output_path), "params.csv"), "w", newline="") as f:
         writer = csv.writer(f)
@@ -85,3 +85,10 @@ def export_param_csv(input_path, output_path, B1, G, fixed_inputs):
             current_offsets = [f"{(offset.item() / 2 / np.pi * 360)%360:.2f}" for offset in phase_offsets]
             offset_strings = "; ".join(current_offsets)
             writer.writerow([i, offset_strings])
+
+        writer.writerow(["Gradient moments"])
+        slice_selec_mom = 1000 * torch.sum(G, dim=0).item() * fixed_inputs["dt_num"]
+        for i, slope in enumerate(slopes):
+            refoc_moment = 1000 * slope / fixed_inputs["gam"]
+            writer.writerow([i, "Slice Selection moment", f"{slice_selec_mom:.6f}"])
+            writer.writerow([i, "Refocusing moment fraction", refoc_moment / slice_selec_mom])

@@ -49,7 +49,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
         B0_vals.append(B0 + B0_freq_offsets_mT[ff])
     B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
     return {
-        "pos": pos,
+        "pos": pos,  # [dm]
         "dt": dt * tfactor,
         "dt_num": dt_num.item() * 1e-3,
         "dx": dx.item(),
