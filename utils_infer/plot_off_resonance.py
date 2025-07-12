@@ -2,6 +2,7 @@ from utils_bloch.blochsim_freqprof import *
 import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
 import os
+from skimage.restoration import unwrap_phase
 
 
 def plot_off_resonance(
@@ -52,8 +53,10 @@ def plot_off_resonance(
     fig.colorbar(im1, ax=axes[0])
 
     # Subplot 2: angle(Mxy)
+    phase = unwrap_phase(np.angle(mxy_profile))
+
     im2 = axes[1].imshow(
-        np.unwrap(angle(mxy_profile), axis=0),
+        phase,
         extent=img_extent,
         aspect="auto",
     )
@@ -125,6 +128,7 @@ def plot_some_b0_values(
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):
         fig, ax = plt.subplots(2, 2, figsize=(14, 6))
+        fig.suptitle(f"B0: {freq_offsets_Hz[ff]/297.3:.1f} ppm")
         mxy_abs = np.abs(mxy[ff, :])
         mxy_argmax = np.argmax(mxy_abs)
         flip_angle = np.arctan(mxy_abs[mxy_argmax] / mz[ff, mxy_argmax]) / 2 / np.pi * 360
@@ -150,10 +154,6 @@ def plot_some_b0_values(
             phasemax = np.max([phasemax, np.max(phase_loc)])
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
-
-        phase_offsets_current_b0 = compute_phase_offsets(phase, slice_centers_current_b0, half_width)
-        for p in phase_offsets_current_b0:
-            print(f"Phase offset for B0 {B0[ff]}: {(p/2/np.pi*360)%360:.2f} degrees")
 
         phase[target_xy[ff, :] < 0.5] = np.nan
         ax_phase = ax[1, 1].twinx()

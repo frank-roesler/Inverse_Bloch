@@ -123,9 +123,10 @@ class InfoScreen:
         self.ax[2] = self.fig.add_subplot(spec_top[2])
         # Second row: 2 equally wide plots
         self.ax_bottom_left = self.fig.add_subplot(spec[1, 0])
+        self.ax_bottom_left.set_ylabel("M_z")
         self.ax_bottom_right = self.fig.add_subplot(spec[1, 1])
         self.ax_phase = self.ax_bottom_right.twinx()
-        self.ax_phase.set_ylabel("Phase (radians)")
+        self.ax_phase.set_ylabel("Phase (rad)")
         self.ax_bottom_right.set_ylabel("|M_xy|")
         self.loss_lines = {}
 
@@ -146,8 +147,8 @@ class InfoScreen:
         self.fig.subplots_adjust(right=0.89)
 
         # Set titles and legends
-        self.ax[0].set_title("Pulse")
-        self.ax[1].set_title("Gradient")
+        self.ax[0].set_title("Pulse [mT]")
+        self.ax[1].set_title("Gradient [mT/m]")
         self.ax[2].set_title("Loss")
         self.ax_bottom_left.set_title("M_z")
         self.ax_bottom_right.set_title("M_xy")

@@ -27,7 +27,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
         u = torch.linspace(-1, 1, Nz)
         pos = abs(u) ** 3
         pos[u < 0] = -pos[u < 0]
-        pos += 0.25 * n_slices * u
+        pos += 0.5 * n_slices * u
         pos = 2 * 0.18 * pos / (torch.max(pos) - torch.min(pos))
         pos = pos.detach()
     else:

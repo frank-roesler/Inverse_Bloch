@@ -82,7 +82,7 @@ def export_param_csv(input_path, output_path, B1, G, fixed_inputs, slopes):
         writer.writerow(["Actual Phase Offsets"])
         phase_offsets_all_b0 = compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs)
         for i, phase_offsets in enumerate(phase_offsets_all_b0):
-            current_offsets = [f"{(offset.item() / 2 / np.pi * 360)%360:.2f}" for offset in phase_offsets]
+            current_offsets = [f"{(offset.item()/2/np.pi*360+180)%360-180:.2f}" for offset in phase_offsets]
             offset_strings = "; ".join(current_offsets)
             writer.writerow([i, offset_strings])
 
