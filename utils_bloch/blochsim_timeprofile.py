@@ -3,10 +3,10 @@ import torch
 from utils_bloch.simulation_utils import *
 
 
-def blochsim_CK_timeprofile(B1, G, pos, sens, B0_list, M0, dt=6.4e-6, **kwargs):
+def blochsim_CK_timeprofile(B1, G, pos, sens, B0_list, M0, dt_num, **kwargs):
     gam, Nb, Ns, Nt, bxy, bz = setup_simulation(G, pos, sens, B0_list, B1)
 
-    alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
+    alpha, beta = compute_alpha_beta(bxy, bz, dt_num, gam)
     statea, stateb = time_loop_complex_timeprof(alpha, beta, Nb, Ns, Nt, B1.device)
     stateaBar, statebBar = torch.conj(statea), torch.conj(stateb)
 

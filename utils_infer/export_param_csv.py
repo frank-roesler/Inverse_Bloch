@@ -38,7 +38,7 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
         n_targets=data_dict["n_slices"],
         pos=fixed_inputs["pos"],
         n_b0_values=data_dict["n_b0_values"],
-        shift_targets=data_dict["shift_targets"],
+        shift_targets=data_dict["shift_targets"] if "shift_targets" in data_dict else False,
     )
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     phase_offsets_all_b0 = []
@@ -53,7 +53,7 @@ def writerow_if_present(writer, key, input_dict):
         writer.writerow([key, input_dict[key]])
 
 
-def export_param_csv(input_path, output_path, B1, G, fixed_inputs):
+def export_param_csv(input_path, output_path, B1, G, fixed_inputs, slopes):
     data_dict = torch.load(input_path, weights_only=False)
     with open(join(dirname(output_path), "params.csv"), "w", newline="") as f:
         writer = csv.writer(f)
@@ -82,6 +82,13 @@ def export_param_csv(input_path, output_path, B1, G, fixed_inputs):
         writer.writerow(["Actual Phase Offsets"])
         phase_offsets_all_b0 = compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs)
         for i, phase_offsets in enumerate(phase_offsets_all_b0):
-            current_offsets = [f"{(offset.item() / 2 / np.pi * 360)%360:.2f}" for offset in phase_offsets]
+            current_offsets = [f"{(offset.item()/2/np.pi*360+180)%360-180:.2f}" for offset in phase_offsets]
             offset_strings = "; ".join(current_offsets)
             writer.writerow([i, offset_strings])
+
+        writer.writerow(["Gradient moments"])
+        slice_selec_mom = 1000 * torch.sum(G, dim=0).item() * fixed_inputs["dt_num"]
+        for i, slope in enumerate(slopes):
+            refoc_moment = 1000 * slope / fixed_inputs["gam"]
+            writer.writerow([i, "Slice Selection moment", f"{slice_selec_mom:.6f}"])
+            writer.writerow([i, "Refocusing moment fraction", refoc_moment / slice_selec_mom])

@@ -49,7 +49,7 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
         B0_vals.append(B0 + B0_freq_offsets_mT[ff])
     B0_list = torch.stack(B0_vals, dim=0).to(torch.float32)
     return {
-        "pos": pos,
+        "pos": pos,  # [dm]
         "dt": dt * tfactor,
         "dt_num": dt_num.item() * 1e-3,
         "dx": dx.item(),
@@ -138,9 +138,10 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     return target_z, target_xy, centers, half_width
 
 
-# fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=128, Nt=64, pos_spacing="nonlinear", n_slices=4)
-# pos = fixed_inputs["pos"]
-# import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-# plt.plot(pos, 0 * pos, ".", markersize=2)
-# plt.show()
+    fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=128, Nt=64, pos_spacing="nonlinear", n_slices=4)
+    pos = fixed_inputs["pos"]
+    plt.plot(pos, 0 * pos, ".", markersize=2)
+    plt.show()
