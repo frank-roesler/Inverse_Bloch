@@ -98,6 +98,7 @@ def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, count_s
     plt.legend()
 
     if path is not None:
-        fig.savefig(os.path.join(os.path.dirname(path), f"phase_error.png"), dpi=300)
+        filename = "phase_error_on_slices.png" if count_slices_with_algorithm else "phase_error_on_targets.png"
+        fig.savefig(os.path.join(os.path.dirname(path), filename), dpi=300)
 
     return slopes

@@ -138,9 +138,10 @@ def get_smooth_targets(theta=np.pi / 2, smoothness=1, function=torch.sigmoid, n_
     return target_z, target_xy, centers, half_width
 
 
-# fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=128, Nt=64, pos_spacing="nonlinear", n_slices=4)
-# pos = fixed_inputs["pos"]
-# import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-# plt.plot(pos, 0 * pos, ".", markersize=2)
-# plt.show()
+    fixed_inputs = get_fixed_inputs(tfactor=2, n_b0_values=3, Nz=128, Nt=64, pos_spacing="nonlinear", n_slices=4)
+    pos = fixed_inputs["pos"]
+    plt.plot(pos, 0 * pos, ".", markersize=2)
+    plt.show()

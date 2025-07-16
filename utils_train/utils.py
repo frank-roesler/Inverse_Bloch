@@ -202,16 +202,15 @@ class InfoScreen:
             self.pulse_imag_plot.set_ydata(pulse_imag)
             self.pulse_abs_plot.set_ydata(pulse_abs)
             minLoss = np.inf
-            maxLoss = 0
             for key, line in self.loss_lines.items():
                 line.set_xdata(np.arange(len(losses[key])))
                 line.set_ydata(losses[key])
                 if key == "boundary_vals_pulse":
                     continue
-                currentMin = np.min(losses[key][-2000:])
+                currentMin = 0.5 * np.min(losses[key][-2000:])
                 if currentMin > 1e-6:
-                    minLoss = 0.5 * min(minLoss, currentMin)
-                maxLoss = 2 * max(maxLoss, np.max(losses[key][-2000:]))
+                    minLoss = min(minLoss, currentMin)
+            maxLoss = 2 * np.max(losses["total"][-2000:])
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
             self.ax_bottom_right.set_xlim(fmin, fmax)
@@ -223,7 +222,7 @@ class InfoScreen:
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
-            self.ax[2].set_ylim((0.9 * minLoss, 1.1 * maxLoss))
+            self.ax[2].set_ylim((minLoss, maxLoss))
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
 
             self.fig.canvas.draw_idle()
@@ -308,10 +307,15 @@ class SliceProfileLoss(torch.nn.Module):
         pulse_height_loss = threshold_loss(pulse, threshold).mean(dim=0)
         return pulse_height_loss
 
-    def compute_phase_ddiff_loss(self, phase, posAx):
+    def compute_phase_diff(self, phase, posAx):
         """Enforces linearity of phase on slices"""
         dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
         phase_diff = torch.diff(phase) / dx
+        return phase_diff, dx
+
+    def compute_phase_ddiff_loss(self, phase, posAx):
+        """Enforces linearity of phase on slices"""
+        phase_diff, dx = self.compute_phase_diff(phase, posAx)
         phase_ddiff = torch.diff(phase_diff) / dx
         phase_ddiff = torch.mean(phase_ddiff[self.where_slices_are[:, 1:-1]] ** 2, dim=-1)
         return phase_diff, phase_ddiff
@@ -352,9 +356,10 @@ class SliceProfileLoss(torch.nn.Module):
         gradient_diff_loss = self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
         phase = torch_unwrap(torch.angle(xy_profile))
-        phase_diff, phase_ddiff = self.compute_phase_ddiff_loss(phase, self.posAx)
+        # phase_diff, phase_ddiff = self.compute_phase_ddiff_loss(phase, self.posAx)
+        phase_diff, _ = self.compute_phase_diff(phase, self.posAx)
         phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
-        phase_B0_diff = self.compute_phase_B0_diff(phase)
+        # phase_B0_diff = self.compute_phase_B0_diff(phase)
         # phase_left_right = self.compute_phase_left_right_loss(phase, posAx)
         # phase_diff_loss = self.compute_phase_diff_loss(phase_diff)
 
@@ -365,9 +370,9 @@ class SliceProfileLoss(torch.nn.Module):
             "gradient_height_loss": self.loss_weights["gradient_height_loss"] * gradient_height_loss,
             "pulse_height_loss": self.loss_weights["pulse_height_loss"] * pulse_height_loss,
             "gradient_diff_loss": self.loss_weights["gradient_diff_loss"] * gradient_diff_loss,
-            "phase_ddiff": self.loss_weights["phase_ddiff"] * phase_ddiff,
+            # "phase_ddiff": self.loss_weights["phase_ddiff"] * phase_ddiff,
             "phase_diff_var": self.loss_weights["phase_diff_var"] * phase_diff_var,
-            "phase_B0_diff": self.loss_weights["phase_B0_diff"] * phase_B0_diff,
+            # "phase_B0_diff": self.loss_weights["phase_B0_diff"] * phase_B0_diff,
         }
 
         if self.verbose:
@@ -444,7 +449,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=60, min_lr=1e-7)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=70, min_lr=1e-7)
     losses = {key: [] for key in loss_weights.keys()}
     losses["total"] = []
     return model, optimizer, scheduler, losses
