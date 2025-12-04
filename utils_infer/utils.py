@@ -8,7 +8,8 @@ def compute_phase_offsets(phase, slice_centers_current_b0, half_width):
         phase_loc = phase[c - half_width : c + half_width]
         phase_mean_slice = np.mean(phase_loc)
         phase_means_current_b0.append(phase_mean_slice)
-        if len(phase_means_current_b0) > 1:
-            for j in range(len(phase_means_current_b0) - 1):
-                phase_offsets_current_b0.append(phase_means_current_b0[j + 1] - phase_means_current_b0[j])
+
+    if len(phase_means_current_b0) > 1:
+        for j in range(len(phase_means_current_b0) - 1):
+            phase_offsets_current_b0.append(phase_means_current_b0[j + 1] - phase_means_current_b0[j])
     return phase_offsets_current_b0

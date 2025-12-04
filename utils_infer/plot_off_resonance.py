@@ -53,7 +53,8 @@ def plot_off_resonance(
     fig.colorbar(im1, ax=axes[0])
 
     # Subplot 2: angle(Mxy)
-    phase = unwrap_phase(np.angle(mxy_profile))
+    # phase = unwrap_phase(np.angle(mxy_profile))
+    phase = np.angle(mxy_profile)
 
     im2 = axes[1].imshow(
         phase,
@@ -85,6 +86,7 @@ def plot_off_resonance(
     # Adjust layout and show the plot
     plt.tight_layout()
     if path is not None:
+        np.save(os.path.join(os.path.dirname(path), "phase.npy"), phase)
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
 
 
