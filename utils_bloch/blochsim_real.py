@@ -1,11 +1,10 @@
 import numpy as np
 import torch
 from utils_bloch.simulation_utils import sinc_of_root, cos_of_root, time_loop_realPulse
+from constants import gamma as gam
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
-    from config import gamma
-
     Ns = pos.shape[0]  # Number of spatial positions
     Nb = B0_list.shape[0]  # Number of B0 values
 
@@ -16,10 +15,10 @@ def setup_simulation(G, pos, sens, B0_list, B1):
     B0_list = B0_list.expand(-1, -1, bz.shape[2])  # Expand B0_list to shape (Nb, Ns, Nt)
 
     bz += B0_list  # Final shape: (Nb, Ns, Nt)
-    return gamma, Nb, Ns, bxy, bz
+    return Nb, Ns, bxy, bz
 
 
-def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam):
+def compute_alpha_beta_without_sqrt(bxy, bz, dt):
     Phi_half_squared = (0.5 * dt * gam) ** 2 * (bxy**2 + bz**2)  # Nb x Ns x Nt
     sinc_part = -gam * dt * 0.5 * sinc_of_root(Phi_half_squared)
     reAlpha = cos_of_root(Phi_half_squared)
@@ -29,9 +28,9 @@ def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam):
 
 
 def blochsim_CK_batch_realPulse(B1, G, pos, sens, B0_list, M0, dt=6.4e-6):
-    gam, Nb, Ns, bxy, bz = setup_simulation(G, pos.real, sens.real, B0_list, B1)
+    Nb, Ns, bxy, bz = setup_simulation(G, pos.real, sens.real, B0_list, B1)
 
-    reAlpha, imAlpha, imBeta = compute_alpha_beta_without_sqrt(bxy, bz, dt, gam)
+    reAlpha, imAlpha, imBeta = compute_alpha_beta_without_sqrt(bxy, bz, dt)
 
     # Loop over time
     reStatea, imStatea, reStateb, imStateb = time_loop_realPulse(

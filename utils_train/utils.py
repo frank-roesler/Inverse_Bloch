@@ -5,7 +5,6 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import torch
 import numpy as np
-from config import model_args, loss_weights
 import os
 import datetime
 import json
@@ -27,7 +26,7 @@ class TrainLogger:
         self.loss_weights = tconfig.loss_weights
         self.export_loc = os.path.join("results", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
         self.new_optimum = False
-        self.t_B1_legacy = self.log["fixed_inputs"]["t_B1_legacy"].to(targets["target_xy"].device)
+        self.t_B1_legacy = self.log["bconfig"].fixed_inputs["t_B1_legacy"].to(targets["target_xy"].device)
 
     def log_epoch(self, epoch, losses, model, optimizer):
         self.log["epoch"] = epoch
@@ -57,8 +56,8 @@ class TrainLogger:
         self.new_optimum = True
 
     def export_json(self):
-        modelname = self.log["model"].name
-        export_path = os.path.join(self.export_loc, f"sms_nn_{modelname}.json")
+        model_name = self.log["model"].name
+        export_path = os.path.join(self.export_loc, f"sms_nn_{model_name}.json")
         dur = 1000 * self.log["fixed_inputs"]["t_B1"][-1].item()
 
         data = {
@@ -234,14 +233,14 @@ class InfoScreen:
 
 
 class SliceProfileLoss(torch.nn.Module):
-    def __init__(self, loss_weights, scanner_params, posAx, delta_t, target_xy, metric="L2", verbose=False):
+    def __init__(self, tconfig, bconfig, sconfig, target_xy, verbose=False):
         super(SliceProfileLoss, self).__init__()
-        self.metric = metric
-        self.loss_weights = loss_weights
+        self.metric = tconfig.loss_metric
+        self.loss_weights = tconfig.loss_weights
         self.verbose = verbose
-        self.scanner_params = scanner_params
-        self.posAx = posAx
-        self.delta_t = delta_t
+        self.scanner_params = sconfig.scanner_params
+        self.posAx = bconfig.fixed_inputs["pos"].to(target_xy.device)
+        self.delta_t = bconfig.fixed_inputs["dt_num"]
         self.where_slices_are = target_xy > 1e-3
 
     def compute_profile_loss(self, xy_profile, z_profile, target_xy, target_z):
@@ -284,15 +283,15 @@ class SliceProfileLoss(torch.nn.Module):
         pulse_height_loss = threshold_loss(pulse, threshold).mean(dim=0)
         return pulse_height_loss
 
-    def compute_phase_diff(self, phase, posAx):
+    def compute_phase_diff(self, phase):
         """Enforces linearity of phase on slices"""
-        dx = 1000 * (posAx[-1] - posAx[0]) / (len(posAx) - 1)
+        dx = 1000 * (self.posAx[-1] - self.posAx[0]) / (len(self.posAx) - 1)
         phase_diff = torch.diff(phase) / dx
         return phase_diff, dx
 
-    def compute_phase_ddiff_loss(self, phase, posAx):
+    def compute_phase_ddiff_loss(self, phase):
         """Enforces linearity of phase on slices"""
-        phase_diff, dx = self.compute_phase_diff(phase, posAx)
+        phase_diff, dx = self.compute_phase_diff(phase, self.posAx)
         phase_ddiff = torch.diff(phase_diff) / dx
         phase_ddiff = torch.mean(phase_ddiff[self.where_slices_are[:, 1:-1]] ** 2, dim=-1)
         return phase_diff, phase_ddiff
@@ -307,10 +306,10 @@ class SliceProfileLoss(torch.nn.Module):
         phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)
         return phase_B0_diff
 
-    def compute_phase_left_right_loss(self, phase, posAx):
+    def compute_phase_left_right_loss(self, phase):
         """Enforces phase offset of 180º between slices. Only works with 2 slices"""
         left = torch.zeros_like(self.where_slices_are)
-        left[:, posAx < 0] = 1
+        left[:, self.posAx < 0] = 1
         right = ~left
         leftPeak = self.where_slices_are * left
         rightPeak = self.where_slices_are * right
@@ -408,7 +407,7 @@ def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1
     return model
 
 
-def init_training(model, lr, device=torch.device("cpu")):
+def init_training(tconfig, model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=lr["pulse"], amsgrad=True)
@@ -427,7 +426,7 @@ def init_training(model, lr, device=torch.device("cpu")):
             amsgrad=True,
         )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=70, min_lr=1e-7)
-    losses = {key: [] for key in loss_weights.keys()}
+    losses = {key: [] for key in tconfig.loss_weights.keys()}
     losses["total"] = []
     return model, optimizer, scheduler, losses
 
@@ -640,7 +639,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
             target_pulse=B1,
             target_gradient=G,
             model=model,
-            fixed_inputs=fixed_inputs,
+            fixed_inputs=bconfig.fixed_inputs,
             lr={"pulse": 1e-2, "gradient": 1e-2},
             thr=0.0027,
             device=device,
@@ -648,7 +647,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
 
     infoscreen = InfoScreen(bconfig, output_every=tconfig.plot_loss_frequency, losses=losses)
     trainLogger = TrainLogger({"target_z": target_z, "target_xy": target_xy}, tconfig, bconfig, mconfig, sconfig)
-    loss_fn = SliceProfileLoss(loss_weights, scanner_params, pos, fixed_inputs["dt_num"], target_xy, metric=loss_metric)
+    loss_fn = SliceProfileLoss(tconfig, bconfig, sconfig, target_xy)
     for epoch in range(tconfig.start_epoch, tconfig.epochs + 1):
         pulse, gradient = model(t_B1)
 
@@ -659,7 +658,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
             sens=sens,
             B0_list=B0_list,
             M0=M0,
-            dt=fixed_inputs["dt_num"],
+            dt=bconfig.fixed_inputs["dt_num"],
             time_loop="complex",
         )
         currentLosses = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)

@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from utils_bloch.simulation_utils import *
 
@@ -31,9 +30,9 @@ def blochsim_CK_batch(B1, G, pos, sens, B0_list, M0, dt=6.4e-6, time_loop="compl
     mz_batch : torch.Tensor
         Final longitudinal magnetization for each B0 value
     """
-    gam, Nb, Ns, Nt, bxy, bz = setup_simulation(G, pos, sens, B0_list, B1)
+    Nb, Ns, Nt, bxy, bz = setup_simulation(G, pos, sens, B0_list, B1)
 
-    alpha, beta = compute_alpha_beta(bxy, bz, dt, gam)
+    alpha, beta = compute_alpha_beta(bxy, bz, dt)
 
     if time_loop == "real":
         reStatea, imStatea, reStateb, imStateb = time_loop_real(

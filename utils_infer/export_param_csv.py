@@ -5,6 +5,7 @@ from utils_bloch import blochsim_CK_batch
 from utils_train.utils import move_to
 from utils_bloch.setup import get_smooth_targets
 import numpy as np
+from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
 
 
 def write_rows_from_dict(heading, input_dict, writer, exclude=[]):
@@ -23,7 +24,7 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1_legacy"]
     pos = fixed_inputs["pos"]
-    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, data_dict["n_b0_values"])
+    freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, data_dict["n_b0_values"])
     B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):

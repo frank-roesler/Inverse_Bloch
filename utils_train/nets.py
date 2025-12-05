@@ -17,7 +17,7 @@ def get_model(model_config):
         "ModulatedFourier": ModulatedFourier,
         "MixedModel_RealPulse": MixedModel_RealPulse,
     }
-    if model_config.model_name not in model_config.model_args:
+    if model_config.model_name not in model_dict:
         raise ValueError(f"Model {model_config.model_name} is not supported.")
     return model_dict[model_config.model_name](**model_config.model_args).float()
 

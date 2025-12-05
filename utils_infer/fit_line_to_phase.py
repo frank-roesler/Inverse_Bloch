@@ -5,12 +5,13 @@ from utils_bloch import blochsim_CK_batch
 import os
 import matplotlib.cm as cm
 from scipy.signal import argrelextrema
+from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
 
 
 def simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3):
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     pos = fixed_inputs["pos"]
-    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_b0_values)
+    freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, n_b0_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
@@ -79,7 +80,7 @@ def fit_lines(phase, half_width, centers_loc, n_slices, fitted_line):
 def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm=False, path=None):
     n_b0_values = len(centers_allB0)
     fitted_lines, phases, slopes = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm)
-    freq_offsets_ppm = torch.linspace(-4.7, 0.0, n_b0_values)
+    freq_offsets_ppm = torch.linspace(-water_ppm, 0.0, n_b0_values)
     cmap = cm.get_cmap("inferno", n_b0_values + 1)
     colors = [cmap(i) for i in range(n_b0_values)]
 

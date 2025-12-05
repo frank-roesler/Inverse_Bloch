@@ -24,7 +24,7 @@ def circshift(x, shift):
 def get_smooth_targets(bloch_config, train_config, function=torch.sigmoid):
     """higher smoothness values give sharper transitions"""
 
-    smoothness *= 1000.0
+    smoothness = train_config.target_smoothness * 1000.0
     width = 0.02
     distance = 0.01
     shift = 0.002 if train_config.shift_targets else 0.0
@@ -39,11 +39,11 @@ def get_smooth_targets(bloch_config, train_config, function=torch.sigmoid):
     minShift = bloch_config.n_b0_values // 2
     for i in range(-minShift, minShift + 1):
 
-        left = -0.5 * (width * bloch_config.n_targets + distance * (bloch_config.n_targets - 1)) - i * shift
+        left = -0.5 * (width * bloch_config.n_slices + distance * (bloch_config.n_slices - 1)) - i * shift
 
         target_xy = torch.zeros(pos.shape, dtype=torch.float32, requires_grad=False)
         centers_loc = []
-        for i in range(bloch_config.n_targets):
+        for i in range(bloch_config.n_slices):
             target_xy += smooth_square_well(
                 pos,
                 left=left,

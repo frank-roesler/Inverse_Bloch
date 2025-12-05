@@ -1,11 +1,10 @@
 import torch
 import numpy as np
 import torch
+from constants import gamma as gam
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
-    from config import fixed_inputs
-
     # Constants
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
 
@@ -26,7 +25,7 @@ def setup_simulation(G, pos, sens, B0_list, B1):
 
     # Add in chunks to avoid excessive memory usage
     bz += B0_list  # Final shape: (Nb, Ns, Nt)
-    return fixed_inputs["gam"], Nb, Ns, Nt, bxy, bz
+    return Nb, Ns, Nt, bxy, bz
 
 
 def my_sinc(x):
@@ -47,7 +46,7 @@ def cos_of_root(small_x):
     return 1 - small_x / 2 + small_x**2 / 24 - small_x**3 / 720 + small_x**4 / 40320
 
 
-def compute_alpha_beta(bxy, bz, dt, gam):
+def compute_alpha_beta(bxy, bz, dt):
     normSquared = (bxy * torch.conj(bxy)).real + bz**2  # Nb x Ns x Nt
     posNormPts = normSquared > 0
     Phi = torch.zeros(normSquared.shape, dtype=torch.float32, device=bxy.device, requires_grad=False)
@@ -58,7 +57,7 @@ def compute_alpha_beta(bxy, bz, dt, gam):
     return alpha, beta
 
 
-def compute_alpha_beta_without_sqrt(bxy, bz, dt, gam):
+def compute_alpha_beta_without_sqrt(bxy, bz, dt):
     Phi_half_squared = (0.5 * dt * gam) ** 2 * ((bxy * torch.conj(bxy)).real + bz**2)  # Nb x Ns x Nt
     sinc_part = -1j * gam * dt * 0.5 * sinc_of_root(Phi_half_squared)
     alpha = cos_of_root(Phi_half_squared) - bz * sinc_part

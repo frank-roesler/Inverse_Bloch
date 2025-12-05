@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from torch import linspace, squeeze, angle
 import os
 from skimage.restoration import unwrap_phase
+from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
 
 
 def plot_off_resonance(
@@ -32,8 +33,8 @@ def plot_off_resonance(
 
     fig, axes = plt.subplots(1, 3, figsize=(14.5, 4))
     img_extent = [
-        linspace(-8000, 8000, npts).min() / 297.3 + 4.7,
-        linspace(-8000, 8000, npts).max() / 297.3 + 4.7,
+        linspace(-8000, 8000, npts).min() / larmor_mhz + water_ppm,
+        linspace(-8000, 8000, npts).max() / larmor_mhz + water_ppm,
         squeeze(pos * 100).max(),
         squeeze(pos * 100).min(),
     ]
@@ -47,7 +48,7 @@ def plot_off_resonance(
     )
     axes[0].set_xlabel("Off Resonance [ppm]")
     axes[0].set_ylabel("Spatial Pos [cm]")
-    axes[0].axvline(4.7, color="r", linewidth=1.5)
+    axes[0].axvline(water_ppm, color="r", linewidth=1.5)
     axes[0].set_title("abs(Mxy)")
     axes[0].invert_xaxis()
     fig.colorbar(im1, ax=axes[0])
@@ -63,7 +64,7 @@ def plot_off_resonance(
     )
     axes[1].set_xlabel("Off Resonance [ppm]")
     axes[1].set_ylabel("Spatial Pos [cm]")
-    axes[1].axvline(4.7, color="r", linewidth=1.5)
+    axes[1].axvline(water_ppm, color="r", linewidth=1.5)
     axes[1].set_title("angle(Mxy)")
     axes[1].invert_xaxis()
     fig.colorbar(im2, ax=axes[1])
@@ -78,7 +79,7 @@ def plot_off_resonance(
     )
     axes[2].set_xlabel("Off Resonance [ppm]")
     axes[2].set_ylabel("Spatial Pos [cm]")
-    axes[2].axvline(4.7, color="r", linewidth=1.5)
+    axes[2].axvline(water_ppm, color="r", linewidth=1.5)
     axes[2].set_title("Mz")
     axes[2].invert_xaxis()
     fig.colorbar(im3, ax=axes[2])
@@ -118,7 +119,7 @@ def plot_some_b0_values(
     gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
     pos = fixed_inputs["pos"]
-    freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_values)
+    freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, n_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
@@ -130,7 +131,7 @@ def plot_some_b0_values(
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):
         fig, ax = plt.subplots(2, 2, figsize=(14, 6))
-        fig.suptitle(f"B0: {freq_offsets_Hz[ff]/297.3:.1f} ppm")
+        fig.suptitle(f"B0: {freq_offsets_Hz[ff]/larmor_mhz:.1f} ppm")
         mxy_abs = np.abs(mxy[ff, :])
         mxy_argmax = np.argmax(mxy_abs)
         flip_angle = np.arctan(mxy_abs[mxy_argmax] / mz[ff, mxy_argmax]) / 2 / np.pi * 360

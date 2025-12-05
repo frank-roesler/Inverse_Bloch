@@ -2,12 +2,10 @@ import numpy as np
 from utils_bloch.blochsim_batch import blochsim_CK_batch
 import torch
 from utils_bloch.simulation_utils import time_loop_complex, compute_alpha_beta
-import config
+from constants import gam_hz_mt
 
 
-def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 1]), dt=6.4e-6, freq_offsets_Hz=np.array([0]), **kwargs):
-    gamma = fixed_inputs["gam"]
-    gamma_hz_mt = fixed_inputs["gam_hz_mt"]
+def blochsim_CK_freqprof(B1, G, pos, sens, B0, M0=np.array([0, 0, 1]), dt=6.4e-6, freq_offsets_Hz=np.array([0]), **kwargs):
     pos = torch.stack([torch.zeros_like(pos), torch.zeros_like(pos), pos], dim=-1)
 
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))
@@ -27,7 +25,7 @@ def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 
         mxy0_base = mxy0_base.flatten()
         mz0_base = mz0_base.flatten()
 
-    B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     mxy_profile = torch.zeros((Ns, Nfreq), dtype=complex)
     mz_profile = torch.zeros((Ns, Nfreq))
 
@@ -37,7 +35,7 @@ def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 
 
         B0_total_this_freq = B0_base + B0_freq_offsets_mT[ff]
         bz = bz_grad_component + torch.tile(B0_total_this_freq, (Nt, 1)).T
-        alpha, beta = compute_alpha_beta(bxy, bz, dt, gamma)
+        alpha, beta = compute_alpha_beta(bxy, bz, dt)
         beta = beta.squeeze()
         statea, stateb = time_loop_complex(alpha.unsqueeze(0), beta.unsqueeze(0), 1, Ns, B1.device)
         statea, stateb = statea.squeeze(), stateb.squeeze()
@@ -52,9 +50,7 @@ def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 
 
 
 def blochsim_CK_freqprof_batch(B1, G, pos, sens, B0, freq_offsets_Hz, dt, M0=torch.Tensor([0, 0, 1]), **kwargs):
-    from config import gamma, gamma_hz_mt
-
-    B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
         B0_list.append(B0 + B0_freq_offsets_mT[ff])

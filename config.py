@@ -2,11 +2,10 @@ import scipy
 import torch
 import numpy as np
 import tomllib
+from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
 
 
 def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="linear", n_slices=1):
-    gam = 267522.1199722082
-    gam_hz_mt = gam / (2 * np.pi)
     inputs = scipy.io.loadmat("data/smPulse_512pts.mat")
     inputs["returnallstates"] = False
     inputs["dt"] = inputs["dtmb"].item()
@@ -36,10 +35,10 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
     B0 = B0.detach().requires_grad_(False)
     M0 = torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32)
     if n_b0_values == 1:
-        freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, 2)
+        freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, 2)
         freq_offsets_Hz = torch.mean(freq_offsets_Hz, dim=0, keepdim=True)
     else:
-        freq_offsets_Hz = torch.linspace(-297.3 * 4.7, 0.0, n_b0_values)
+        freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, n_b0_values)
     B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_vals = []
     for ff in range(len(freq_offsets_Hz)):
@@ -59,8 +58,6 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
         "inputs": inputs,
         "freq_offsets_Hz": freq_offsets_Hz,
         "B0_list": B0_list,
-        "gam": gam,
-        "gam_hz_mt": gam_hz_mt,
     }
 
 
@@ -138,14 +135,14 @@ class ModelConfig(InputData):
     def __init__(self, t_B1, path):
         super().__init__()
         data_dict = self.load_toml(path)
-        self.modelname = data_dict["modelname"]
+        self.model_name = data_dict["model_name"]
         self.model_args = data_dict["model_args"]
         self.model_args["tmin"] = t_B1[0].item()
         self.model_args["tmax"] = t_B1[-1].item()
 
     def to_dict(self):
         out_dict = {}
-        out_dict["modelname"] = self.modelname
+        out_dict["model_name"] = self.model_name
         out_dict["model_args"] = self.model_args
         return out_dict
 

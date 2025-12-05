@@ -11,15 +11,6 @@ pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
 
-[loss_weights]
-loss_mxy = 1.0
-loss_mz = 1.0
-boundary_vals_pulse = 100.0
-gradient_height_loss = 0.1
-pulse_height_loss = 1000.0
-gradient_diff_loss = 1.0
-phase_diff_var = 1000.0
-
 # BLOCH PARAMETERS:
 n_slices = 2
 n_b0_values = 5
@@ -30,7 +21,16 @@ Nt = 64 # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
 
 # MODEL PARAMETERS:
-modelname = "MixedModel" # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
+model_name = "MixedModel" # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
+
+[loss_weights]
+loss_mxy = 1.0
+loss_mz = 1.0
+boundary_vals_pulse = 100.0
+gradient_height_loss = 0.1
+pulse_height_loss = 1000.0
+gradient_diff_loss = 1.0
+phase_diff_var = 1000.0
 
 [model_args]
 n_coeffs = 50 # Fourier Series
