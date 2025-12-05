@@ -5,7 +5,7 @@ from matplotlib.collections import LineCollection
 import matplotlib.cm as cm
 import torch
 import numpy as np
-from params import model_args, loss_weights
+from config import model_args, loss_weights
 import os
 import datetime
 import json
@@ -13,49 +13,25 @@ from utils_bloch import blochsim_CK_batch
 
 
 class TrainLogger:
-    def __init__(
-        self,
-        fixed_inputs,
-        flip_angle,
-        loss_metric,
-        targets,
-        model_args,
-        scanner_params,
-        loss_weights,
-        n_slices,
-        n_b0_values,
-        tfactor,
-        Nz,
-        Nt,
-        pos_spacing,
-        shift_targets,
-        start_logging=1,
-    ):
+    def __init__(self, targets, tconfig, bconfig, mconfig, sconfig):
         self.log = {
-            "flip_angle": flip_angle,
-            "loss_metric": loss_metric,
-            "model_args": model_args,
-            "scanner_params": scanner_params,
-            "loss_weights": loss_weights,
-            "fixed_inputs": fixed_inputs,
+            "tconfig": tconfig,
+            "bconfig": bconfig,
+            "mconfig": mconfig,
+            "sconfig": sconfig,
             "targets": targets,
-            "n_slices": n_slices,
-            "n_b0_values": n_b0_values,
-            "tfactor": tfactor,
-            "Nz": Nz,
-            "Nt": Nt,
-            "pos_spacing": pos_spacing,
-            "shift_targets": shift_targets,
         }
-        self.start_logging = start_logging
+        self.log["epoch"] = tconfig.start_epoch
+        self.start_logging = tconfig.start_logging
         self.best_loss = np.inf
-        self.loss_weights = loss_weights
+        self.loss_weights = tconfig.loss_weights
         self.export_loc = os.path.join("results", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
         self.new_optimum = False
         self.t_B1_legacy = self.log["fixed_inputs"]["t_B1_legacy"].to(targets["target_xy"].device)
 
     def log_epoch(self, epoch, losses, model, optimizer):
         self.log["epoch"] = epoch
+        self.log["tconfig"]["start_epoch"] = epoch
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
@@ -63,14 +39,14 @@ class TrainLogger:
             pulse, gradient = model(self.t_B1_legacy)
         self.log["pulse"] = pulse.detach().cpu()
         self.log["gradient"] = gradient.detach().cpu()
-        self.save(epoch, losses)
+        self.save(losses)
 
-    def save(self, epoch, losses):
+    def save(self, losses):
         if not losses["total"][-1] < 0.99 * self.best_loss:
             self.new_optimum = False
             return
         self.best_loss = losses["total"][-1]
-        if epoch <= self.start_logging:
+        if self.log["epoch"] <= self.start_logging:
             self.new_optimum = False
             return
         os.makedirs(self.export_loc, exist_ok=True)
@@ -105,11 +81,13 @@ class TrainLogger:
 
 
 class InfoScreen:
-    def __init__(self, output_every=1, losses={}):
+    def __init__(self, bloch_config, output_every=1, losses={}):
         self.t0 = time()
         self.t1 = time()
         self.output_every = output_every
         self.init_plots(losses)
+        self.pos = bloch_config.fixed_inputs["pos"].cpu()
+        self.t_B1 = bloch_config.fixed_inputs["t_B1"].cpu()
 
     def init_plots(self, losses):
         self.fig = plt.figure(figsize=(14, 7), constrained_layout=False)
@@ -156,13 +134,12 @@ class InfoScreen:
         self.ax[1].legend()
         plt.show(block=False)
 
-    def plot_info(self, epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
+    def plot_info(self, epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
         """plots info curves during training"""
         if epoch % self.output_every == 0 or trainlogger.new_optimum:
-            pos = pos.cpu()
-            fmin = torch.min(pos).item()
-            fmax = torch.max(pos).item()
-            t = t_B1.detach().cpu().numpy()
+            fmin = torch.min(self.pos).item()
+            fmax = torch.max(self.pos).item()
+            t = self.t_B1.detach().cpu().numpy()
             mz_plot = mz.detach().cpu().numpy()
             mxy_abs = np.abs(mxy.detach().cpu().numpy())
             tgt_z = target_z.detach().cpu().numpy()
@@ -191,11 +168,11 @@ class InfoScreen:
             self.pulse_imag_plot.set_xdata(t)
             self.pulse_abs_plot.set_xdata(t)
 
-            self.add_line_collection(self.ax_bottom_left, pos, mz_plot)
-            self.add_line_collection(self.ax_bottom_right, pos, mxy_abs)
-            self.add_line_collection(self.ax_phase, pos, phase, linestyle="dotted")
-            self.add_line_collection(self.ax_bottom_left, pos, tgt_z, cmap="viridis")
-            self.add_line_collection(self.ax_bottom_right, pos, tgt_xy, cmap="viridis")
+            self.add_line_collection(self.ax_bottom_left, self.pos, mz_plot)
+            self.add_line_collection(self.ax_bottom_right, self.pos, mxy_abs)
+            self.add_line_collection(self.ax_phase, self.pos, phase, linestyle="dotted")
+            self.add_line_collection(self.ax_bottom_left, self.pos, tgt_z, cmap="viridis")
+            self.add_line_collection(self.ax_bottom_right, self.pos, tgt_xy, cmap="viridis")
 
             self.grad_plot.set_ydata(gradient_for_plot)
             self.pulse_real_plot.set_ydata(pulse_real)
@@ -462,121 +439,143 @@ def threshold_loss(x, threshold):
 
 
 def load_data(path, mode="inference", device="cpu"):
-    creation_time = os.path.getctime(path)
-    creation_datetime = datetime.datetime.fromtimestamp(creation_time)
-    refactor_date = datetime.datetime(2025, 5, 23)
-    if creation_datetime < refactor_date:
-        return load_data_legacy(path, mode=mode)
-    else:
-        return load_data_new(path, mode=mode, device=device)
-
-
-def load_data_new(path, mode="inference", device="cpu"):
-    import params
     from utils_bloch.setup import get_smooth_targets
 
     data_dict = torch.load(path, weights_only=False, map_location=device)
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
-    epoch = data_dict["epoch"]
     losses = data_dict["losses"]
     model = data_dict["model"]
     optimizer = data_dict["optimizer"]
-    fixed_inputs = data_dict["fixed_inputs"]
-    flip_angle = data_dict["flip_angle"]
-    loss_metric = data_dict["loss_metric"]
-    scanner_params = data_dict["scanner_params"]
-    loss_weights = data_dict["loss_weights"]
-    n_slices = data_dict["n_slices"]
-    shift_targets = data_dict["shift_targets"] if "shift_targets" in data_dict else params.shift_targets
-    fixed_inputs = params.get_fixed_inputs(
-        tfactor=params.tfactor,
-        n_b0_values=params.n_b0_values,
-        Nz=params.Nz,
-        Nt=params.Nt,
-        pos_spacing=params.pos_spacing,
-    )
-    target_z, target_xy, slice_centers, half_width = get_smooth_targets(
-        theta=flip_angle,
-        smoothness=params.target_smoothness,
-        function=torch.sigmoid,
-        n_targets=n_slices,
-        pos=fixed_inputs["pos"],
-        n_b0_values=data_dict["n_b0_values"],
-        shift_targets=shift_targets,
-    )
+    tconfig = data_dict["tconfig"]
+    bconfig = data_dict["bconfig"]
+    mconfig = data_dict["mconfig"]
+    sconfig = data_dict["sconfig"]
+    target_z, target_xy, slice_centers, half_width = get_smooth_targets(bconfig, tconfig)
 
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
-        return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, shift_targets, n_slices, fixed_inputs
-    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, model_args, epoch
+        return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, tconfig, bconfig
+    return model, target_z, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig
 
 
-def load_data_legacy(path, mode="inference"):
-    import params
-
-    data_dict = torch.load(path, weights_only=False, map_location="cpu")
-    target_z = data_dict["targets"]["target_z"]
-    target_xy = data_dict["targets"]["target_xy"]
-    epoch = data_dict["epoch"]
-    losses = data_dict["losses"]
-    model = data_dict["model"]
-    optimizer = data_dict["optimizer"]
-    (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
-    fixed_inputs = params.fixed_inputs
-
-    fixed_inputs["pos"] = pos
-    fixed_inputs["dt"] = dt
-    fixed_inputs["dx"] = dx
-    fixed_inputs["Nz"] = Nz
-    fixed_inputs["sens"] = sens
-    fixed_inputs["B0"] = B0
-    fixed_inputs["tAx"] = tAx
-    fixed_inputs["fAx"] = fAx
-    fixed_inputs["t_B1"] = t_B1
-    fixed_inputs["M0"] = M0
-    fixed_inputs["inputs"] = inputs
-    flip_angle = data_dict["flip_angle"] if "flip_angle" in data_dict else params.flip_angle
-    loss_metric = data_dict["loss_metric"] if "loss_metric" in data_dict else params.loss_metric
-    scanner_params = data_dict["scanner_params"] if "scanner_params" in data_dict else params.scanner_params
-    loss_weights = data_dict["loss_weights"] if "loss_weights" in data_dict else params.loss_weights
-
-    if mode == "inference":
-        pulse = data_dict["pulse"].detach().cpu()
-        gradient = data_dict["gradient"].detach().cpu()
-        return pulse, gradient, target_z, target_xy, fixed_inputs
-    return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
+# def load_data(path, mode="inference", device="cpu"):
+#     creation_time = os.path.getctime(path)
+#     creation_datetime = datetime.datetime.fromtimestamp(creation_time)
+#     refactor_date = datetime.datetime(2025, 5, 23)
+#     if creation_datetime < refactor_date:
+#         return load_data_legacy(path, mode=mode)
+#     else:
+#         return load_data_new(path, mode=mode, device=device)
 
 
-def load_data_old(path):
-    import params
+# def load_data_new(path, mode="inference", device="cpu"):
+#     import config
+#     from utils_bloch.setup import get_smooth_targets
 
-    data_dict = torch.load(path, weights_only=False, map_location="cpu")
-    epoch = data_dict["epoch"]
-    losses = data_dict["losses"]
-    model = data_dict["model"]
-    optimizer = data_dict["optimizer"]
-    (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
-    target_z = data_dict["targets"]["target_z"]
-    target_xy = data_dict["targets"]["target_xy"]
-    pulse = data_dict["pulse"].detach().cpu()
-    gradient = data_dict["gradient"].detach().cpu()
+#     data_dict = torch.load(path, weights_only=False, map_location=device)
+#     target_z = data_dict["targets"]["target_z"]
+#     target_xy = data_dict["targets"]["target_xy"]
+#     epoch = data_dict["epoch"]
+#     losses = data_dict["losses"]
+#     model = data_dict["model"]
+#     optimizer = data_dict["optimizer"]
+#     fixed_inputs = data_dict["fixed_inputs"]
+#     flip_angle = data_dict["flip_angle"]
+#     loss_metric = data_dict["loss_metric"]
+#     scanner_params = data_dict["scanner_params"]
+#     loss_weights = data_dict["loss_weights"]
+#     n_slices = data_dict["n_slices"]
+#     shift_targets = data_dict["shift_targets"] if "shift_targets" in data_dict else config.shift_targets
+#     fixed_inputs = config.get_fixed_inputs(
+#         tfactor=config.tfactor,
+#         n_b0_values=config.n_b0_values,
+#         Nz=config.Nz,
+#         Nt=config.Nt,
+#         pos_spacing=config.pos_spacing,
+#     )
+#     target_z, target_xy, slice_centers, half_width = get_smooth_targets(
+#         theta=flip_angle,
+#         smoothness=config.target_smoothness,
+#         function=torch.sigmoid,
+#         n_targets=n_slices,
+#         pos=fixed_inputs["pos"],
+#         n_b0_values=data_dict["n_b0_values"],
+#         shift_targets=shift_targets,
+#     )
 
-    fixed_inputs = params.fixed_inputs
+#     if mode == "inference":
+#         pulse = data_dict["pulse"].detach().cpu()
+#         gradient = data_dict["gradient"].detach().cpu()
+#         return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, shift_targets, n_slices, fixed_inputs
+#     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, model_args, epoch
 
-    fixed_inputs["pos"] = pos
-    fixed_inputs["dt"] = dt
-    fixed_inputs["dx"] = dx
-    fixed_inputs["Nz"] = Nz
-    fixed_inputs["sens"] = sens
-    fixed_inputs["B0"] = B0
-    fixed_inputs["tAx"] = tAx
-    fixed_inputs["fAx"] = fAx
-    fixed_inputs["t_B1"] = t_B1
-    fixed_inputs["M0"] = M0
-    fixed_inputs["inputs"] = inputs
-    return epoch, losses, model, optimizer, pulse, gradient, target_z, target_xy, fixed_inputs
+
+# def load_data_legacy(path, mode="inference"):
+#     import config
+
+#     data_dict = torch.load(path, weights_only=False, map_location="cpu")
+#     target_z = data_dict["targets"]["target_z"]
+#     target_xy = data_dict["targets"]["target_xy"]
+#     epoch = data_dict["epoch"]
+#     losses = data_dict["losses"]
+#     model = data_dict["model"]
+#     optimizer = data_dict["optimizer"]
+#     (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
+#     fixed_inputs = config.fixed_inputs
+
+#     fixed_inputs["pos"] = pos
+#     fixed_inputs["dt"] = dt
+#     fixed_inputs["dx"] = dx
+#     fixed_inputs["Nz"] = Nz
+#     fixed_inputs["sens"] = sens
+#     fixed_inputs["B0"] = B0
+#     fixed_inputs["tAx"] = tAx
+#     fixed_inputs["fAx"] = fAx
+#     fixed_inputs["t_B1"] = t_B1
+#     fixed_inputs["M0"] = M0
+#     fixed_inputs["inputs"] = inputs
+#     flip_angle = data_dict["flip_angle"] if "flip_angle" in data_dict else config.flip_angle
+#     loss_metric = data_dict["loss_metric"] if "loss_metric" in data_dict else config.loss_metric
+#     scanner_params = data_dict["scanner_params"] if "scanner_params" in data_dict else config.scanner_params
+#     loss_weights = data_dict["loss_weights"] if "loss_weights" in data_dict else config.loss_weights
+
+#     if mode == "inference":
+#         pulse = data_dict["pulse"].detach().cpu()
+#         gradient = data_dict["gradient"].detach().cpu()
+#         return pulse, gradient, target_z, target_xy, fixed_inputs
+#     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
+
+
+# def load_data_old(path):
+#     import config
+
+#     data_dict = torch.load(path, weights_only=False, map_location="cpu")
+#     epoch = data_dict["epoch"]
+#     losses = data_dict["losses"]
+#     model = data_dict["model"]
+#     optimizer = data_dict["optimizer"]
+#     (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
+#     target_z = data_dict["targets"]["target_z"]
+#     target_xy = data_dict["targets"]["target_xy"]
+#     pulse = data_dict["pulse"].detach().cpu()
+#     gradient = data_dict["gradient"].detach().cpu()
+
+#     fixed_inputs = config.fixed_inputs
+
+#     fixed_inputs["pos"] = pos
+#     fixed_inputs["dt"] = dt
+#     fixed_inputs["dx"] = dx
+#     fixed_inputs["Nz"] = Nz
+#     fixed_inputs["sens"] = sens
+#     fixed_inputs["B0"] = B0
+#     fixed_inputs["tAx"] = tAx
+#     fixed_inputs["fAx"] = fAx
+#     fixed_inputs["t_B1"] = t_B1
+#     fixed_inputs["M0"] = M0
+#     fixed_inputs["inputs"] = inputs
+#     return epoch, losses, model, optimizer, pulse, gradient, target_z, target_xy, fixed_inputs
 
 
 def torch_unwrap(phase, discont=torch.pi):
@@ -615,41 +614,15 @@ def regularize_model_gradients(model):
     return model
 
 
-def train(
-    model,
-    target_z,
-    target_xy,
-    optimizer,
-    scheduler,
-    losses,
-    fixed_inputs,
-    flip_angle,
-    loss_metric,
-    scanner_params,
-    loss_weights,
-    n_slices,
-    n_b0_values,
-    tfactor,
-    Nz,
-    Nt,
-    pos_spacing,
-    shift_targets,
-    start_epoch,
-    epochs,
-    device,
-    start_logging,
-    plot_loss_freq,
-    pre_train_inputs=False,
-    suppress_loss_peaks=False,
-):
+def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tconfig, bconfig, mconfig, sconfig):
     B0, B0_list, M0, sens, t_B1, pos, target_z, target_xy, model = move_to(
         (
-            fixed_inputs["B0"],
-            fixed_inputs["B0_list"],
-            fixed_inputs["M0"],
-            fixed_inputs["sens"],
-            fixed_inputs["t_B1"],
-            fixed_inputs["pos"],
+            bconfig.fixed_inputs["B0"],
+            bconfig.fixed_inputs["B0_list"],
+            bconfig.fixed_inputs["M0"],
+            bconfig.fixed_inputs["sens"],
+            bconfig.fixed_inputs["t_B1"],
+            bconfig.fixed_inputs["pos"],
             target_z,
             target_xy,
             model,
@@ -661,8 +634,8 @@ def train(
             if isinstance(v, torch.Tensor):
                 state[k] = v.to(device)
 
-    if pre_train_inputs:
-        (B1, G, _, _, fixed_inputs) = load_data("results/120625_Mixed_1Slice_90deg_L2/train_log.pt")
+    if tconfig.pre_train_inputs:
+        (model, B1, G, _, _, _, _, _, _) = load_data("results/120625_Mixed_1Slice_90deg_L2/train_log.pt")
         model = pre_train(
             target_pulse=B1,
             target_gradient=G,
@@ -673,26 +646,10 @@ def train(
             device=device,
         )
 
-    infoscreen = InfoScreen(output_every=plot_loss_freq, losses=losses)
-    trainLogger = TrainLogger(
-        fixed_inputs,
-        flip_angle,
-        loss_metric,
-        {"target_z": target_z, "target_xy": target_xy},
-        model_args,
-        scanner_params,
-        loss_weights,
-        n_slices,
-        n_b0_values,
-        tfactor,
-        Nz,
-        Nt,
-        pos_spacing,
-        shift_targets,
-        start_logging=start_logging,
-    )
+    infoscreen = InfoScreen(bconfig, output_every=tconfig.plot_loss_frequency, losses=losses)
+    trainLogger = TrainLogger({"target_z": target_z, "target_xy": target_xy}, tconfig, bconfig, mconfig, sconfig)
     loss_fn = SliceProfileLoss(loss_weights, scanner_params, pos, fixed_inputs["dt_num"], target_xy, metric=loss_metric)
-    for epoch in range(start_epoch, epochs + 1):
+    for epoch in range(tconfig.start_epoch, tconfig.epochs + 1):
         pulse, gradient = model(t_B1)
 
         mxy, mz = blochsim_CK_batch(
@@ -714,7 +671,7 @@ def train(
             losses[key].append(value)
         optimizer.zero_grad()
         currentLoss.backward()
-        if suppress_loss_peaks:
+        if tconfig.suppress_loss_peaks:
             # model = regularize_model_gradients(model)
             if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
                 (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
@@ -728,7 +685,7 @@ def train(
         scheduler.step(currentLossItems["total"])
 
         trainLogger.log_epoch(epoch, losses, model, optimizer)
-        infoscreen.plot_info(epoch, losses, pos, t_B1, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
+        infoscreen.plot_info(epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
         infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
 
     from forward import forward

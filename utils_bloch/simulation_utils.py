@@ -4,7 +4,7 @@ import torch
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
-    from params import fixed_inputs
+    from config import fixed_inputs
 
     # Constants
     G = torch.column_stack((0 * G.flatten(), 0 * G.flatten(), G.flatten()))

@@ -1,0 +1,56 @@
+# TRAINING PARAMETERS:
+start_epoch = 0
+target_smoothness = 4.0
+shift_targets = true
+epochs = 40000
+resume_from_path = "" # was None in Python — set to empty string when not used
+lr = { pulse = 1e-4, gradient = 1e-4 } # learning rates
+plot_loss_frequency = 100
+start_logging = 2000
+pre_train_inputs = false
+suppress_loss_peaks = false
+loss_metric = "L1"
+
+[loss_weights]
+loss_mxy = 1.0
+loss_mz = 1.0
+boundary_vals_pulse = 100.0
+gradient_height_loss = 0.1
+pulse_height_loss = 1000.0
+gradient_diff_loss = 1.0
+phase_diff_var = 1000.0
+
+# BLOCH PARAMETERS:
+n_slices = 2
+n_b0_values = 5
+flip_angle = 1.5707963267948966 # pi/2
+tfactor = 2 # pulse time is 0.64ms * tfactor
+Nz = 128 # number of mesh points in pos axis
+Nt = 64 # number of mesh points per 0.64ms time interval
+pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
+
+# MODEL PARAMETERS:
+modelname = "MixedModel" # MLP, SIREN, RBFN, FourierMLP, FourierSeries, ModulatedFourier, MixedModel
+
+[model_args]
+n_coeffs = 50 # Fourier Series
+omega_0 = 43 # SIREN
+bandwidth = 101 # ModulatedFourier
+hidden_dim = 32 # MLP, SIREN, ModulatedFourier
+num_layers = 16 # MLP, SIREN
+num_centers = 10 # RBFN
+center_spacing = 1 # RBFN
+num_fourier_features = 51 # FourierMLP
+frequency_scale = 100.0 # FourierMLP
+gradient_scale = 20.0 # relative size of gradient to RF pulse
+positive_gradient = true
+
+# PARAMETERS OF THE SCANNER (constraints used by loss):
+[scanner_params]
+max_gradient = 50
+max_diff_gradient = 200
+max_pulse_amplitude = 0.035
+
+
+# "tmin": fixed_inputs["t_B1"][0].item(),
+# "tmax": fixed_inputs["t_B1"][-1].item(),

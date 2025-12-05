@@ -1,6 +1,6 @@
 from utils_bloch.setup import *
 from utils_train.utils import *
-from params import *
+from config import *
 from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error, export_param_csv
 
 

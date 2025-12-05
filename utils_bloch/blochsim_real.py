@@ -4,7 +4,7 @@ from utils_bloch.simulation_utils import sinc_of_root, cos_of_root, time_loop_re
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
-    from params import gamma
+    from config import gamma
 
     Ns = pos.shape[0]  # Number of spatial positions
     Nb = B0_list.shape[0]  # Number of B0 values

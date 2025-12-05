@@ -2,7 +2,7 @@ import numpy as np
 from utils_bloch.blochsim_batch import blochsim_CK_batch
 import torch
 from utils_bloch.simulation_utils import time_loop_complex, compute_alpha_beta
-import params
+import config
 
 
 def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 1]), dt=6.4e-6, freq_offsets_Hz=np.array([0]), **kwargs):
@@ -52,7 +52,7 @@ def blochsim_CK_freqprof(fixed_inputs, B1, G, pos, sens, B0, M0=np.array([0, 0, 
 
 
 def blochsim_CK_freqprof_batch(B1, G, pos, sens, B0, freq_offsets_Hz, dt, M0=torch.Tensor([0, 0, 1]), **kwargs):
-    from params import gamma, gamma_hz_mt
+    from config import gamma, gamma_hz_mt
 
     B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
     B0_list = []
