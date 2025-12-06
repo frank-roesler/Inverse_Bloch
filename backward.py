@@ -13,7 +13,7 @@ mconfig = ModelConfig(bconfig.fixed_inputs["t_B1"], config_path)
 sconfig = ScannerConfig(config_path)
 
 
-target_z, target_xy, _, _ = get_smooth_targets(bconfig, tconfig, function=torch.sigmoid)
+target_z, target_xy, _, _ = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid)
 model = get_model(mconfig)
 model, optimizer, scheduler, losses = init_training(tconfig, model, tconfig.lr, device=device)
 

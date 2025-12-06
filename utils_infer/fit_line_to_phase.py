@@ -9,16 +9,14 @@ from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
 
 
 def simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3):
-    gamma_hz_mt = fixed_inputs["gam_hz_mt"]
-    pos = fixed_inputs["pos"]
     freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, n_b0_values)
-    B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
         B0_list.append(fixed_inputs["B0"] + B0_freq_offsets_mT[ff])
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
-    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
+    mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=fixed_inputs["pos"], sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
     return mxy, mz
 
 

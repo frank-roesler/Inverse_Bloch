@@ -3,21 +3,21 @@ start_epoch = 0
 target_smoothness = 4.0
 shift_targets = true
 epochs = 40000
-resume_from_path = "" # was None in Python — set to empty string when not used
+resume_from_path = "results/2025-12-05_21-44/train_log.pt" 
 lr = { pulse = 1e-4, gradient = 1e-4 } # learning rates
 plot_loss_frequency = 100
-start_logging = 2000
+start_logging = 1000
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
 
 # BLOCH PARAMETERS:
 n_slices = 2
-n_b0_values = 5
+n_b0_values = 3
 flip_angle = 1.5707963267948966 # pi/2
 tfactor = 2 # pulse time is 0.64ms * tfactor
 Nz = 128 # number of mesh points in pos axis
-Nt = 64 # number of mesh points per 0.64ms time interval
+Nt = 128 # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
 
 # MODEL PARAMETERS:
@@ -30,7 +30,7 @@ boundary_vals_pulse = 100.0
 gradient_height_loss = 0.1
 pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
-phase_diff_var = 1000.0
+phase_diff_var = 100.0
 
 [model_args]
 n_coeffs = 50 # Fourier Series
@@ -49,8 +49,4 @@ positive_gradient = true
 [scanner_params]
 max_gradient = 50
 max_diff_gradient = 200
-max_pulse_amplitude = 0.035
-
-
-# "tmin": fixed_inputs["t_B1"][0].item(),
-# "tmax": fixed_inputs["t_B1"][-1].item(),
+max_pulse_amplitude = 0.03

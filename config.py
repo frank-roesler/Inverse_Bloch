@@ -154,4 +154,4 @@ class ScannerConfig(InputData):
         self.scanner_params = data_dict["scanner_params"]
 
     def to_dict(self):
-        return self.scanner_params
+        return {"scanner_params": self.scanner_params}

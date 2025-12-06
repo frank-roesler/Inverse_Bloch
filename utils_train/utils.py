@@ -30,7 +30,7 @@ class TrainLogger:
 
     def log_epoch(self, epoch, losses, model, optimizer):
         self.log["epoch"] = epoch
-        self.log["tconfig"]["start_epoch"] = epoch
+        self.log["tconfig"].start_epoch = epoch
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
@@ -58,14 +58,14 @@ class TrainLogger:
     def export_json(self):
         model_name = self.log["model"].name
         export_path = os.path.join(self.export_loc, f"sms_nn_{model_name}.json")
-        dur = 1000 * self.log["fixed_inputs"]["t_B1"][-1].item()
+        dur = 1000 * self.log["bconfig"].fixed_inputs["t_B1"][-1].item()
 
         data = {
             "id": "sms_nn_150425_MLP_square2",
             "set": {
                 "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
                 "dur": dur,
-                "pts": len(self.log["fixed_inputs"]["t_B1"]),
+                "pts": len(self.log["bconfig"].fixed_inputs["t_B1"]),
                 "amplInt": None,
                 "refocFract": None,
             },
@@ -332,11 +332,11 @@ class SliceProfileLoss(torch.nn.Module):
         gradient_diff_loss = self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
         phase = torch_unwrap(torch.angle(xy_profile))
-        # phase_diff, phase_ddiff = self.compute_phase_ddiff_loss(phase, self.posAx)
-        phase_diff, _ = self.compute_phase_diff(phase, self.posAx)
+        # phase_diff, phase_ddiff = self.compute_phase_ddiff_loss(phase)
+        phase_diff, _ = self.compute_phase_diff(phase)
         phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
         # phase_B0_diff = self.compute_phase_B0_diff(phase)
-        # phase_left_right = self.compute_phase_left_right_loss(phase, posAx)
+        # phase_left_right = self.compute_phase_left_right_loss(phase)
         # phase_diff_loss = self.compute_phase_diff_loss(phase_diff)
 
         epoch_losses = {
@@ -387,7 +387,7 @@ def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1
 
         loss_pulse = torch.mean(torch.abs(pulse - target_pulse) ** 2)
         loss_gradient = torch.mean((gradient - target_gradient) ** 2)
-        loss = loss_pulse + loss_gradient / model_args["gradient_scale"]
+        loss = loss_pulse + loss_gradient / model.gradient_scale
 
         optimizer.zero_grad()
         loss.backward()
@@ -450,131 +450,13 @@ def load_data(path, mode="inference", device="cpu"):
     bconfig = data_dict["bconfig"]
     mconfig = data_dict["mconfig"]
     sconfig = data_dict["sconfig"]
-    target_z, target_xy, slice_centers, half_width = get_smooth_targets(bconfig, tconfig)
+    target_z, target_xy, slice_centers, half_width = get_smooth_targets(tconfig, bconfig)
 
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
         return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, tconfig, bconfig
     return model, target_z, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig
-
-
-# def load_data(path, mode="inference", device="cpu"):
-#     creation_time = os.path.getctime(path)
-#     creation_datetime = datetime.datetime.fromtimestamp(creation_time)
-#     refactor_date = datetime.datetime(2025, 5, 23)
-#     if creation_datetime < refactor_date:
-#         return load_data_legacy(path, mode=mode)
-#     else:
-#         return load_data_new(path, mode=mode, device=device)
-
-
-# def load_data_new(path, mode="inference", device="cpu"):
-#     import config
-#     from utils_bloch.setup import get_smooth_targets
-
-#     data_dict = torch.load(path, weights_only=False, map_location=device)
-#     target_z = data_dict["targets"]["target_z"]
-#     target_xy = data_dict["targets"]["target_xy"]
-#     epoch = data_dict["epoch"]
-#     losses = data_dict["losses"]
-#     model = data_dict["model"]
-#     optimizer = data_dict["optimizer"]
-#     fixed_inputs = data_dict["fixed_inputs"]
-#     flip_angle = data_dict["flip_angle"]
-#     loss_metric = data_dict["loss_metric"]
-#     scanner_params = data_dict["scanner_params"]
-#     loss_weights = data_dict["loss_weights"]
-#     n_slices = data_dict["n_slices"]
-#     shift_targets = data_dict["shift_targets"] if "shift_targets" in data_dict else config.shift_targets
-#     fixed_inputs = config.get_fixed_inputs(
-#         tfactor=config.tfactor,
-#         n_b0_values=config.n_b0_values,
-#         Nz=config.Nz,
-#         Nt=config.Nt,
-#         pos_spacing=config.pos_spacing,
-#     )
-#     target_z, target_xy, slice_centers, half_width = get_smooth_targets(
-#         theta=flip_angle,
-#         smoothness=config.target_smoothness,
-#         function=torch.sigmoid,
-#         n_targets=n_slices,
-#         pos=fixed_inputs["pos"],
-#         n_b0_values=data_dict["n_b0_values"],
-#         shift_targets=shift_targets,
-#     )
-
-#     if mode == "inference":
-#         pulse = data_dict["pulse"].detach().cpu()
-#         gradient = data_dict["gradient"].detach().cpu()
-#         return model, pulse, gradient, target_z, target_xy, slice_centers, half_width, shift_targets, n_slices, fixed_inputs
-#     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, model_args, epoch
-
-
-# def load_data_legacy(path, mode="inference"):
-#     import config
-
-#     data_dict = torch.load(path, weights_only=False, map_location="cpu")
-#     target_z = data_dict["targets"]["target_z"]
-#     target_xy = data_dict["targets"]["target_xy"]
-#     epoch = data_dict["epoch"]
-#     losses = data_dict["losses"]
-#     model = data_dict["model"]
-#     optimizer = data_dict["optimizer"]
-#     (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
-#     fixed_inputs = config.fixed_inputs
-
-#     fixed_inputs["pos"] = pos
-#     fixed_inputs["dt"] = dt
-#     fixed_inputs["dx"] = dx
-#     fixed_inputs["Nz"] = Nz
-#     fixed_inputs["sens"] = sens
-#     fixed_inputs["B0"] = B0
-#     fixed_inputs["tAx"] = tAx
-#     fixed_inputs["fAx"] = fAx
-#     fixed_inputs["t_B1"] = t_B1
-#     fixed_inputs["M0"] = M0
-#     fixed_inputs["inputs"] = inputs
-#     flip_angle = data_dict["flip_angle"] if "flip_angle" in data_dict else config.flip_angle
-#     loss_metric = data_dict["loss_metric"] if "loss_metric" in data_dict else config.loss_metric
-#     scanner_params = data_dict["scanner_params"] if "scanner_params" in data_dict else config.scanner_params
-#     loss_weights = data_dict["loss_weights"] if "loss_weights" in data_dict else config.loss_weights
-
-#     if mode == "inference":
-#         pulse = data_dict["pulse"].detach().cpu()
-#         gradient = data_dict["gradient"].detach().cpu()
-#         return pulse, gradient, target_z, target_xy, fixed_inputs
-#     return model, target_z, target_xy, optimizer, losses, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, epoch
-
-
-# def load_data_old(path):
-#     import config
-
-#     data_dict = torch.load(path, weights_only=False, map_location="cpu")
-#     epoch = data_dict["epoch"]
-#     losses = data_dict["losses"]
-#     model = data_dict["model"]
-#     optimizer = data_dict["optimizer"]
-#     (pos, dt, dx, Nz, sens, B0, tAx, fAx, t_B1, M0, inputs) = data_dict["inputs"]
-#     target_z = data_dict["targets"]["target_z"]
-#     target_xy = data_dict["targets"]["target_xy"]
-#     pulse = data_dict["pulse"].detach().cpu()
-#     gradient = data_dict["gradient"].detach().cpu()
-
-#     fixed_inputs = config.fixed_inputs
-
-#     fixed_inputs["pos"] = pos
-#     fixed_inputs["dt"] = dt
-#     fixed_inputs["dx"] = dx
-#     fixed_inputs["Nz"] = Nz
-#     fixed_inputs["sens"] = sens
-#     fixed_inputs["B0"] = B0
-#     fixed_inputs["tAx"] = tAx
-#     fixed_inputs["fAx"] = fAx
-#     fixed_inputs["t_B1"] = t_B1
-#     fixed_inputs["M0"] = M0
-#     fixed_inputs["inputs"] = inputs
-#     return epoch, losses, model, optimizer, pulse, gradient, target_z, target_xy, fixed_inputs
 
 
 def torch_unwrap(phase, discont=torch.pi):

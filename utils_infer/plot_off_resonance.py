@@ -17,7 +17,6 @@ def plot_off_resonance(
     npts = len(freq_offsets_Hz)
     pos = fixed_inputs["pos"].detach().cpu()
     [mxy_profile, mz_profile] = blochsim_CK_freqprof(
-        fixed_inputs,
         rf.detach().cpu(),
         grad.detach().cpu(),
         pos=pos,
@@ -91,36 +90,18 @@ def plot_off_resonance(
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
 
 
-def plot_some_b0_values(
-    n_values,
-    fixed_inputs,
-    G,
-    B1,
-    flip_angle,
-    target_smoothness,
-    n_slices,
-    shift_targets,
-    path=None,
-):
+def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=None):
     from utils_train.utils import move_to
     from utils_infer import compute_phase_offsets
     from utils_bloch.setup import get_smooth_targets
 
-    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(
-        theta=flip_angle,
-        smoothness=target_smoothness,
-        function=torch.sigmoid,
-        n_targets=n_slices,
-        pos=fixed_inputs["pos"],
-        n_b0_values=n_values,
-        shift_targets=shift_targets,
-    )
+    bconfig.n_b0_values = n_values
+    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
 
-    gamma_hz_mt = fixed_inputs["gam_hz_mt"]
     t_B1 = fixed_inputs["t_B1"]
     pos = fixed_inputs["pos"]
     freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, n_values)
-    B0_freq_offsets_mT = freq_offsets_Hz / gamma_hz_mt
+    B0_freq_offsets_mT = freq_offsets_Hz / gam_hz_mt
     B0_list = []
     for ff in range(len(freq_offsets_Hz)):
         B0_list.append(fixed_inputs["B0"] + B0_freq_offsets_mT[ff])
