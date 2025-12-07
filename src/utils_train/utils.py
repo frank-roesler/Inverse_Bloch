@@ -1,14 +1,16 @@
 from time import time
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.collections import LineCollection
-import matplotlib.cm as cm
 import torch
 import numpy as np
 import os
 import datetime
 import json
 from utils_bloch import blochsim_CK_batch
+from utils_bloch.old.blochsim_CK import blochsim_CK
+from matplotlib.collections import LineCollection
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.cm as cm
+import gc
 
 
 class TrainLogger:
@@ -205,7 +207,6 @@ class InfoScreen:
             if trainlogger.new_optimum:
                 os.makedirs(trainlogger.export_loc, exist_ok=True)
                 plt.savefig(os.path.join(trainlogger.export_loc, "training.png"), dpi=300)
-            plt.pause(0.05)
             self.fig.canvas.flush_events()
 
     def add_line_collection(self, ax, xdata, ydata, linestyle="solid", cmap="inferno"):
@@ -543,6 +544,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
             dt=bconfig.fixed_inputs["dt_num"],
             time_loop="complex",
         )
+
         currentLosses = loss_fn(mz, mxy, target_z, target_xy, pulse, gradient)
         currentLoss = sum(currentLosses.values())
 
@@ -565,11 +567,12 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
         optimizer.step()
         scheduler.step(currentLossItems["total"])
 
-        trainLogger.log_epoch(epoch, losses, model, optimizer)
-        infoscreen.plot_info(epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
-        infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
+        with torch.no_grad():
+            trainLogger.log_epoch(epoch, losses, model, optimizer)
+            infoscreen.plot_info(epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
+            infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
 
     from forward import forward
 
     if os.path.exists(trainLogger.export_loc):
-        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=4096, Nt=512, npts_off_resonance=512)
+        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=2048, Nt=512, npts_off_resonance=256)

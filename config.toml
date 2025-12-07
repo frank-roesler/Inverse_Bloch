@@ -2,18 +2,18 @@
 start_epoch = 0
 target_smoothness = 4.0
 shift_targets = true
-epochs = 40000
+epochs = 1000
 resume_from_path = "" 
-lr = { pulse = 1e-5, gradient = 1e-5 } # learning rates
+lr = { pulse = 2e-5, gradient = 2e-5 } # learning rates
 plot_loss_frequency = 10
-start_logging = 1000
+start_logging = 900
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
 
 # BLOCH PARAMETERS:
 n_slices = 2
-n_b0_values = 1
+n_b0_values = 3
 flip_angle = 1.5707963267948966 # pi/2
 tfactor = 2 # pulse time is 0.64ms * tfactor
 Nz = 256 # number of mesh points in pos axis
@@ -30,7 +30,7 @@ boundary_vals_pulse = 100.0
 gradient_height_loss = 0.1
 pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
-phase_diff_var = 1.0
+phase_diff_var = 10.0
 
 [model_args]
 n_coeffs = 50 # Fourier Series

@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torch
 from constants import gamma as gam
+from time import time
 
 
 def setup_simulation(G, pos, sens, B0_list, B1):
