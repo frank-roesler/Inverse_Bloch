@@ -22,7 +22,7 @@ class TrainLogger:
             "sconfig": sconfig,
             "targets": targets,
         }
-        self.log["epoch"] = tconfig.start_epoch
+        self.log["step"] = tconfig.start_step
         self.start_logging = tconfig.start_logging
         self.best_loss = np.inf
         self.loss_weights = tconfig.loss_weights
@@ -30,9 +30,9 @@ class TrainLogger:
         self.new_optimum = False
         self.t_B1_legacy = self.log["bconfig"].fixed_inputs["t_B1_legacy"].to(targets["target_xy"].device)
 
-    def log_epoch(self, epoch, losses, model, optimizer):
-        self.log["epoch"] = epoch
-        self.log["tconfig"].start_epoch = epoch
+    def log_step(self, step, losses, model, optimizer):
+        self.log["step"] = step
+        self.log["tconfig"].start_step = step
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
@@ -47,7 +47,7 @@ class TrainLogger:
             self.new_optimum = False
             return
         self.best_loss = losses["total"][-1]
-        if self.log["epoch"] <= self.start_logging:
+        if self.log["step"] <= self.start_logging:
             self.new_optimum = False
             return
         os.makedirs(self.export_loc, exist_ok=True)
@@ -135,9 +135,9 @@ class InfoScreen:
         self.ax[1].legend()
         plt.show(block=False)
 
-    def plot_info(self, epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
+    def plot_info(self, step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
         """plots info curves during training"""
-        if epoch % self.output_every == 0 or trainlogger.new_optimum:
+        if step % self.output_every == 0 or trainlogger.new_optimum:
             fmin = torch.min(self.pos).item()
             fmax = torch.max(self.pos).item()
             t = self.t_B1.detach().cpu().numpy()
@@ -195,7 +195,7 @@ class InfoScreen:
             self.ax_phase.set_xlim(fmin, fmax)
             self.ax[0].set_xlim(t[0], t[-1])
             self.ax[1].set_xlim(t[0], t[-1])
-            self.ax[2].set_xlim(0, epoch + 1)
+            self.ax[2].set_xlim(0, step + 1)
             self.ax_bottom_left.set_ylim(-0.1, 1.1)
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
@@ -219,12 +219,12 @@ class InfoScreen:
         line_collection = LineCollection(line_list, linewidths=0.7, colors=colors, linestyle=linestyle)
         ax.add_collection(line_collection)
 
-    def print_info(self, epoch, loss, optimizer, best_loss):
-        if not epoch % 10 == 0:
+    def print_info(self, step, loss, optimizer, best_loss):
+        if not step % 10 == 0:
             return
         self.t1 = time() - self.t0
         self.t0 = time()
-        print("Epoch: ", epoch)
+        print("Step: ", step)
         print(f"Loss: {loss['total']:.6f}")
         print(f"Best Loss: {best_loss:.6f}")
         for i, param_group in enumerate(optimizer.param_groups):
@@ -333,14 +333,12 @@ class SliceProfileLoss(torch.nn.Module):
         gradient_diff_loss = self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
         phase = torch_unwrap(torch.angle(xy_profile))
-        # phase_diff, phase_ddiff = self.compute_phase_ddiff_loss(phase)
         phase_diff, _ = self.compute_phase_diff(phase)
         phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
-        # phase_B0_diff = self.compute_phase_B0_diff(phase)
         # phase_left_right = self.compute_phase_left_right_loss(phase)
-        # phase_diff_loss = self.compute_phase_diff_loss(phase_diff)
+        # phase_B0_diff = self.compute_phase_B0_diff(phase)
 
-        epoch_losses = {
+        step_losses = {
             "loss_mxy": self.loss_weights["loss_mxy"] * loss_mxy,
             "loss_mz": self.loss_weights["loss_mz"] * loss_mz,
             "boundary_vals_pulse": self.loss_weights["boundary_vals_pulse"] * boundary_vals_pulse,
@@ -355,10 +353,10 @@ class SliceProfileLoss(torch.nn.Module):
         if self.verbose:
             print("-" * 50)
             print("LOSSES:")
-            for key, value in epoch_losses.items():
+            for key, value in step_losses.items():
                 print(f"{key}: {value.mean().item():.6f}")
             print("-" * 50)
-        return epoch_losses
+        return step_losses
 
 
 def get_device():
@@ -381,9 +379,9 @@ def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1
     model, optimizer, scheduler, _ = init_training(model, lr=lr, device=device)
     t_B1 = fixed_inputs["t_B1"].to(device)
     loss = torch.inf
-    epoch = 0
+    step = 0
     while loss > thr:
-        epoch += 1
+        step += 1
         pulse, gradient = model(t_B1)
 
         loss_pulse = torch.mean(torch.abs(pulse - target_pulse) ** 2)
@@ -394,8 +392,8 @@ def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1
         loss.backward()
         optimizer.step()
         scheduler.step(loss.item())
-        if epoch % 1000 == 0:
-            print(f"Epoch: {epoch}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
+        if step % 1000 == 0:
+            print(f"step: {step}, Loss: {loss.item():.6f}, lr: {optimizer.param_groups[0]['lr']}")
     # plt.figure()
     # plt.plot(torch.real(pulse).detach().cpu().numpy(), label="pulse real")
     # plt.plot(torch.real(target_pulse).detach().cpu().numpy(), label="target pulse real")
@@ -531,7 +529,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
     infoscreen = InfoScreen(bconfig, output_every=tconfig.plot_loss_frequency, losses=losses)
     trainLogger = TrainLogger({"target_z": target_z, "target_xy": target_xy}, tconfig, bconfig, mconfig, sconfig)
     loss_fn = SliceProfileLoss(tconfig, bconfig, sconfig, target_xy)
-    for epoch in range(tconfig.start_epoch, tconfig.epochs + 1):
+    for step in range(tconfig.start_step, tconfig.steps + 1):
         pulse, gradient = model(t_B1)
 
         mxy, mz = blochsim_CK_batch(
@@ -556,7 +554,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
         currentLoss.backward()
         if tconfig.suppress_loss_peaks:
             # model = regularize_model_gradients(model)
-            if epoch > 100 and losses[-1] > 2 * trainLogger.best_loss:
+            if step > 100 and losses[-1] > 2 * trainLogger.best_loss:
                 (model, target_z, target_xy, optimizer, _, fixed_inputs, flip_angle, loss_metric, scanner_params, loss_weights, _) = load_data(
                     os.path.join(trainLogger.export_loc, "train_log.pt"), mode="train", device=device
                 )
@@ -568,11 +566,11 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
         scheduler.step(currentLossItems["total"])
 
         with torch.no_grad():
-            trainLogger.log_epoch(epoch, losses, model, optimizer)
-            infoscreen.plot_info(epoch, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
-            infoscreen.print_info(epoch, currentLossItems, optimizer, trainLogger.best_loss)
+            trainLogger.log_step(step, losses, model, optimizer)
+            infoscreen.plot_info(step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
+            infoscreen.print_info(step, currentLossItems, optimizer, trainLogger.best_loss)
 
     from forward import forward
 
     if os.path.exists(trainLogger.export_loc):
-        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=2048, Nt=512, npts_off_resonance=256)
+        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=2048, Nt=512, npts_off_resonance=128)

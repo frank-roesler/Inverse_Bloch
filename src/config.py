@@ -75,10 +75,10 @@ class TrainingConfig(InputData):
     def __init__(self, path):
         super().__init__()
         data_dict = self.load_toml(path)
-        self.start_epoch = data_dict["start_epoch"]
+        self.start_step = data_dict["start_step"]
         self.target_smoothness = data_dict["target_smoothness"]
         self.shift_targets = data_dict["shift_targets"]
-        self.epochs = data_dict["epochs"]
+        self.steps = data_dict["steps"]
         self.resume_from_path = data_dict["resume_from_path"]
         self.lr = data_dict["lr"]
         self.plot_loss_frequency = data_dict["plot_loss_frequency"]
@@ -90,10 +90,10 @@ class TrainingConfig(InputData):
 
     def to_dict(self):
         out_dict = {}
-        out_dict["start_epoch"] = self.start_epoch
+        out_dict["start_step"] = self.start_step
         out_dict["target_smoothness"] = self.target_smoothness
         out_dict["shift_targets"] = self.shift_targets
-        out_dict["epochs"] = self.epochs
+        out_dict["steps"] = self.steps
         out_dict["resume_from_path"] = self.resume_from_path
         out_dict["lr"] = self.lr
         out_dict["plot_loss_frequency"] = self.plot_loss_frequency

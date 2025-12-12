@@ -62,7 +62,7 @@ def export_param_csv(input_path, output_path, B1, G, fixed_inputs, slopes):
 
         writer.writerow(["Training Parameters"])
         writer.writerow(["model", data_dict["model"].name])
-        writerow_if_present(writer, "epoch", data_dict)
+        writerow_if_present(writer, "step", data_dict)
         writerow_if_present(writer, "loss_metric", tconfig)
         writerow_if_present(writer, "shift_targets", tconfig)
         write_rows_from_dict("Loss Weights", tconfig, writer)

@@ -112,7 +112,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
     delta_t = np.diff(t_B1, axis=0)
     for ff in range(len(freq_offsets_Hz)):
         fig, ax = plt.subplots(2, 2, figsize=(14, 6))
-        fig.suptitle(f"B0: {freq_offsets_Hz[ff]/larmor_mhz:.1f} ppm")
+        fig.suptitle(f"B0: {-freq_offsets_Hz[ff]/larmor_mhz:.1f} ppm")
         mxy_abs = np.abs(mxy[ff, :])
         mxy_argmax = np.argmax(mxy_abs)
         flip_angle = np.arctan(mxy_abs[mxy_argmax] / mz[ff, mxy_argmax]) / 2 / np.pi * 360

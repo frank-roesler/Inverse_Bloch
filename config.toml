@@ -1,23 +1,23 @@
 # TRAINING PARAMETERS:
-start_epoch = 0
+start_step = 0
 target_smoothness = 4.0
 shift_targets = true
-epochs = 1000
+steps = 1000
 resume_from_path = "" 
-lr = { pulse = 2e-5, gradient = 2e-5 } # learning rates
+lr = { pulse = 1e-5, gradient = 1e-5 } # learning rates
 plot_loss_frequency = 10
-start_logging = 900
+start_logging = 500
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
 
 # BLOCH PARAMETERS:
 n_slices = 2
-n_b0_values = 3
+n_b0_values = 1
 flip_angle = 1.5707963267948966 # pi/2
 tfactor = 2 # pulse time is 0.64ms * tfactor
-Nz = 256 # number of mesh points in pos axis
-Nt = 128 # number of mesh points per 0.64ms time interval
+Nz = 512 # number of mesh points in pos axis
+Nt = 64 # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
 
 # MODEL PARAMETERS:
@@ -30,7 +30,7 @@ boundary_vals_pulse = 100.0
 gradient_height_loss = 0.1
 pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
-phase_diff_var = 10.0
+phase_diff_var = 1.0
 
 [model_args]
 n_coeffs = 50 # Fourier Series
@@ -42,9 +42,8 @@ num_centers = 10 # RBFN
 center_spacing = 1 # RBFN
 num_fourier_features = 51 # FourierMLP
 frequency_scale = 100.0 # FourierMLP
-gradient_scale = 20.0 # relative size of gradient to RF pulse
+gradient_scale = 10.0 # relative size of gradient to RF pulse
 positive_gradient = true
-
 # PARAMETERS OF THE SCANNER (constraints used by loss):
 [scanner_params]
 max_gradient = 50
