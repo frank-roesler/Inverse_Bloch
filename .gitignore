@@ -11,3 +11,4 @@ results/*
 */*.pdf
 *.mp4
 .DS_Store
+Inverse_Bloch.code-workspace
