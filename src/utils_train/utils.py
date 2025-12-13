@@ -307,18 +307,19 @@ class SliceProfileLoss(torch.nn.Module):
         phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)
         return phase_B0_diff
 
-    def compute_phase_left_right_loss(self, phase):
+    def compute_phase_offset_loss(self, phase):
         """Enforces phase offset of 180º between slices. Only works with 2 slices"""
         left = torch.zeros_like(self.where_slices_are)
         left[:, self.posAx < 0] = 1
         right = ~left
         leftPeak = self.where_slices_are * left
         rightPeak = self.where_slices_are * right
-        phase_left = (phase * leftPeak).mean(dim=-1)
-        phase_right = (phase * rightPeak).mean(dim=-1)
-        phase_left_right = torch.abs(phase_left - phase_right) % np.pi
-        phase_left_right = 0.1 * (phase_left_right - np.pi) ** 2
-        return phase_left_right
+        phase_left = phase * leftPeak
+        phase_right = phase * rightPeak
+        phase_left = torch.trapz(phase_left, self.posAx, dim=1) / torch.trapz(1.0 * leftPeak, self.posAx, dim=1)
+        phase_right = torch.trapz(phase_right, self.posAx, dim=1) / torch.trapz(1.0 * rightPeak, self.posAx, dim=1)
+        phase_offset = (phase_left - phase_right) % (2 * np.pi) - np.pi
+        return (phase_offset - np.pi / 2) ** 2
 
     def compute_phase_diff_loss(self, phase_diff):
         """Penalizes slope of phase on slices. Thereby enforces self-refocusoing"""
@@ -335,8 +336,8 @@ class SliceProfileLoss(torch.nn.Module):
         phase = torch_unwrap(torch.angle(xy_profile))
         phase_diff, _ = self.compute_phase_diff(phase)
         phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
-        # phase_left_right = self.compute_phase_left_right_loss(phase)
-        # phase_B0_diff = self.compute_phase_B0_diff(phase)
+        phase_B0_diff = self.compute_phase_B0_diff(phase)
+        phase_offset = self.compute_phase_offset_loss(phase)
 
         step_losses = {
             "loss_mxy": self.loss_weights["loss_mxy"] * loss_mxy,
@@ -345,9 +346,10 @@ class SliceProfileLoss(torch.nn.Module):
             "gradient_height_loss": self.loss_weights["gradient_height_loss"] * gradient_height_loss,
             "pulse_height_loss": self.loss_weights["pulse_height_loss"] * pulse_height_loss,
             "gradient_diff_loss": self.loss_weights["gradient_diff_loss"] * gradient_diff_loss,
-            # "phase_ddiff": self.loss_weights["phase_ddiff"] * phase_ddiff,
             "phase_diff_var": self.loss_weights["phase_diff_var"] * phase_diff_var,
-            # "phase_B0_diff": self.loss_weights["phase_B0_diff"] * phase_B0_diff,
+            # "phase_diff": self.loss_weights["phase_diff"] * torch.mean(phase_diff**2),
+            "phase_B0_diff": self.loss_weights["phase_B0_diff"] * phase_B0_diff,
+            "phase_offset": self.loss_weights["phase_offset"] * phase_offset.mean(),
         }
 
         if self.verbose:
@@ -424,7 +426,7 @@ def init_training(tconfig, model, lr, device=torch.device("cpu")):
             [{"params": pulse_params, "lr": lr["pulse"]}, {"params": gradient_params, "lr": lr["gradient"]}],
             amsgrad=True,
         )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=70, min_lr=1e-7)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=1000, min_lr=1e-6)
     losses = {key: [] for key in tconfig.loss_weights.keys()}
     losses["total"] = []
     return model, optimizer, scheduler, losses
@@ -573,4 +575,4 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
     from forward import forward
 
     if os.path.exists(trainLogger.export_loc):
-        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=2048, Nt=512, npts_off_resonance=128)
+        forward(os.path.join(trainLogger.export_loc, "train_log.pt"), npts_some_b0_values=7, Nz=1024, Nt=256, npts_off_resonance=256)
