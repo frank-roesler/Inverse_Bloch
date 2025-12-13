@@ -110,7 +110,7 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
     mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     delta_t = np.diff(t_B1, axis=0)
-    for ff in range(len(freq_offsets_Hz)):
+    for j, ff in enumerate(range(len(freq_offsets_Hz))):
         fig, ax = plt.subplots(2, 2, figsize=(14, 6))
         fig.suptitle(f"B0: {-freq_offsets_Hz[ff]/larmor_mhz:.1f} ppm")
         mxy_abs = np.abs(mxy[ff, :])

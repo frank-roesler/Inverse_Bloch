@@ -33,7 +33,7 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
     mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
-    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid)
+    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     phase_offsets_all_b0 = []
     for ff in range(len(freq_offsets_Hz)):
