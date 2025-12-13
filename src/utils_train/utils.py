@@ -304,7 +304,9 @@ class SliceProfileLoss(torch.nn.Module):
 
     def compute_phase_B0_diff(self, phase):
         """When training multiple B0 values at once, this loss penalizes large variation of the phase in B0 direction"""
-        phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase, dim=0) ** 2)
+        slice_cover = torch.any(self.where_slices_are, dim=0)
+        phase_slice = phase[:, slice_cover]
+        phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase_slice, dim=0) ** 2)
         return phase_B0_diff
 
     def compute_phase_offset_loss(self, phase):
@@ -319,7 +321,7 @@ class SliceProfileLoss(torch.nn.Module):
         phase_left = torch.trapz(phase_left, self.posAx, dim=1) / torch.trapz(1.0 * leftPeak, self.posAx, dim=1)
         phase_right = torch.trapz(phase_right, self.posAx, dim=1) / torch.trapz(1.0 * rightPeak, self.posAx, dim=1)
         phase_offset = (phase_left - phase_right) % (2 * np.pi) - np.pi
-        return (phase_offset - np.pi / 2) ** 2
+        return (phase_offset + np.pi / 2) ** 2
 
     def compute_phase_diff_loss(self, phase_diff):
         """Penalizes slope of phase on slices. Thereby enforces self-refocusoing"""
@@ -333,10 +335,11 @@ class SliceProfileLoss(torch.nn.Module):
         pulse_height_loss = self.compute_pulse_height_loss(pulse, self.scanner_params["max_pulse_amplitude"])
         gradient_diff_loss = self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
-        phase = torch_unwrap(torch.angle(xy_profile))
+        phase = torch.angle(xy_profile)
+        phase_B0_diff = self.compute_phase_B0_diff(phase)
+        phase = torch_unwrap(phase)
         phase_diff, _ = self.compute_phase_diff(phase)
         phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
-        phase_B0_diff = self.compute_phase_B0_diff(phase)
         phase_offset = self.compute_phase_offset_loss(phase)
 
         step_losses = {
@@ -552,6 +555,12 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
         currentLossItems["total"] = currentLoss.item()
         for key, value in currentLossItems.items():
             losses[key].append(value)
+
+        with torch.no_grad():
+            trainLogger.log_step(step, losses, model, optimizer)
+            infoscreen.plot_info(step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
+            infoscreen.print_info(step, currentLossItems, optimizer, trainLogger.best_loss)
+
         optimizer.zero_grad()
         currentLoss.backward()
         if tconfig.suppress_loss_peaks:
@@ -566,11 +575,6 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
                 continue
         optimizer.step()
         scheduler.step(currentLossItems["total"])
-
-        with torch.no_grad():
-            trainLogger.log_step(step, losses, model, optimizer)
-            infoscreen.plot_info(step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
-            infoscreen.print_info(step, currentLossItems, optimizer, trainLogger.best_loss)
 
     from forward import forward
 

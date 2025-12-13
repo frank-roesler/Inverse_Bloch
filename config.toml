@@ -32,7 +32,7 @@ pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
 phase_diff_var = 10.0
 # phase_diff = 0.01
-phase_B0_diff = 1e-4
+phase_B0_diff = 1e-3
 phase_offset = 0.1
 
 [model_args]
