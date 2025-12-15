@@ -4,9 +4,9 @@ target_smoothness = 4.0
 shift_targets = false
 steps = 20000
 resume_from_path = "" 
-lr = { pulse = 1e-5, gradient = 1e-5 } # learning rates
+lr = { pulse = 1e-5, gradient = 5e-6 } # learning rates
 plot_loss_frequency = 10
-start_logging = 1000
+start_logging = 2000
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
@@ -32,12 +32,12 @@ pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
 phase_diff_var = 10.0
 # phase_diff = 0.01
-phase_B0_diff = 1e-3
-phase_offset = 0.1
+phase_B0_diff = 1e-2
+phase_offset = 1
 
 [model_args]
 n_coeffs = 50 # Fourier Series
-omega_0 = 43 # SIREN
+omega_0 = 46 # SIREN
 bandwidth = 101 # ModulatedFourier
 hidden_dim = 32 # MLP, SIREN, ModulatedFourier
 num_layers = 16 # MLP, SIREN
@@ -45,7 +45,7 @@ num_centers = 10 # RBFN
 center_spacing = 1 # RBFN
 num_fourier_features = 51 # FourierMLP
 frequency_scale = 100.0 # FourierMLP
-gradient_scale = 40.0 # relative size of gradient to RF pulse
+gradient_scale = 10.0 # relative size of gradient to RF pulse
 positive_gradient = false
 
 # PARAMETERS OF THE SCANNER (constraints used by loss):
