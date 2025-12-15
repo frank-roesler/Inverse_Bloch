@@ -71,7 +71,7 @@ export_param_csv(input_path, output_path)
 - Training and inference results are saved in timestamped folders under `results/`.
 
 ## Requirements
-- Python 3.8+
+- Python 3.11+
 - PyTorch
 - NumPy
 - Matplotlib
