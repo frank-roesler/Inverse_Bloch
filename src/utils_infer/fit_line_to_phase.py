@@ -33,7 +33,37 @@ def count_slices(abs_mxy):
     return ((centers, half_width), True)
 
 
-def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width, count_slices_with_algorithm):
+def fit_line_to_phase2(fixed_inputs, B1, G, centers, half_width):
+    n_slices = len(centers[0])
+    n_b0_values = len(centers)
+    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
+    phases = []
+    slopes = []
+    x = np.arange(-half_width, half_width + 1, dtype=np.float32) / (2 * half_width) * 0.02
+    for ff in range(mxy.shape[0]):
+        phase = np.unwrap(np.angle(mxy[ff, :]))
+        for i in range(n_slices):
+            center = centers[ff][i]
+            start = max(center - half_width, 0)
+            end = min(center + half_width, len(phase) - 1)
+            current_phase = phase[start : end + 1] - np.mean(phase[start : end + 1])
+            current_slope, _ = np.polyfit(x, current_phase, 1)
+            phases.append(current_phase)
+            slopes.append(current_slope)
+    mean_slope = np.mean(slopes)
+    remaining_variation = float("inf")
+    best_slope = mean_slope
+    for s in np.arange(0.8 * mean_slope, 1.2 * mean_slope, 0.001 * mean_slope):
+        fitted_line = s * x
+        M = max(max(p - fitted_line) for p in phases)
+        m = min(min(p - fitted_line) for p in phases)
+        if M - m < remaining_variation:
+            remaining_variation = M - m
+            best_slope = s
+    return best_slope * x, phases, best_slope
+
+
+def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width, count_slices_with_algorithm=False):
     n_slices = len(centers[0])
     n_b0_values = len(centers)
     mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
@@ -75,6 +105,31 @@ def fit_lines(phase, half_width, centers_loc, n_slices, fitted_line):
     return slope, fitted_line, phase
 
 
+def plot_phase_fit_error2(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
+    n_b0_values = len(centers_allB0)
+    fitted_line, phases, slope = fit_line_to_phase2(fixed_inputs, B1, G, centers_allB0, half_width)
+    freq_offsets_ppm = torch.linspace(-water_ppm, 0.0, n_b0_values)
+    cmap = cm.get_cmap("inferno", n_b0_values + 1)
+    colors = [cmap(i) for i in range(n_b0_values)]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for i, phase in enumerate(phases):
+        label = f"{freq_offsets_ppm[i//2]:.1f} ppm" if i % 2 == 0 else None
+        ax.plot(phase - fitted_line, linewidth=0.8, label=label, color=colors[i % n_b0_values])
+    zero = phase[0] * 0.0
+    ax.plot(zero, linewidth=0.8, color="black", linestyle="dotted")
+    ax.set_title("Phase Fitting and Error")
+    ax.set_xlabel("Slice")
+    ax.set_ylabel("Phase Value")
+    ax.legend(fontsize="x-small")
+
+    if path is not None:
+        filename = "phase_error_on_targets.png"
+        fig.savefig(os.path.join(os.path.dirname(path), filename), dpi=300)
+
+    return [slope] * n_b0_values
+
+
 def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm=False, path=None):
     n_b0_values = len(centers_allB0)
     fitted_lines, phases, slopes = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm)
@@ -91,6 +146,9 @@ def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, count_s
         error = phases[i] - fitted_line
         error[~where_slices_are[i].astype(bool)] = np.nan
         plt.plot(fixed_inputs["pos"], error, linewidth=0.8, label=f"{freq_offsets_ppm[i]:.1f} ppm", color=colors[i])
+    zero = fixed_inputs["pos"] * 0.0
+    zero[~where_slices_are.astype(bool).all(axis=0)] = np.nan
+    plt.plot(fixed_inputs["pos"], zero, linewidth=0.8, color="black", linestyle="dotted")
     plt.title("Phase Fitting and Error")
     plt.xlabel("pos")
     plt.ylabel("Phase Value")
