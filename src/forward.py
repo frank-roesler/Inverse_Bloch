@@ -1,7 +1,7 @@
 from utils_bloch.setup import *
 from utils_train.utils import *
 from config import *
-from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error2, export_param_csv
+from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error, export_param_csv
 
 
 def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512):
@@ -27,11 +27,11 @@ def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512)
 
     freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
     with torch.no_grad():
-        # plot_some_b0_values(npts_some_b0_values, forward_inputs, G, B1, tconfig, bconfig, path=path)
-        # plot_timeprof(B1, G, forward_inputs, slice_centers_allB0, half_width, path=path)
-        slopes = plot_phase_fit_error2(forward_inputs, B1, G, slice_centers_allB0, half_width, path=path)
-        # export_param_csv(path, path, B1, G, forward_inputs, slopes)
-        # plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
+        plot_some_b0_values(npts_some_b0_values, forward_inputs, G, B1, tconfig, bconfig, path=path)
+        plot_timeprof(B1, G, forward_inputs, slice_centers_allB0, half_width, path=path)
+        slope = plot_phase_fit_error(forward_inputs, B1, G, slice_centers_allB0, half_width, path=path)
+        export_param_csv(path, path, B1, G, forward_inputs, slope)
+        plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
     # plt.show()
 
 

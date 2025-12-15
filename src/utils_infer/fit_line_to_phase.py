@@ -33,7 +33,7 @@ def count_slices(abs_mxy):
     return ((centers, half_width), True)
 
 
-def fit_line_to_phase2(fixed_inputs, B1, G, centers, half_width):
+def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
     n_slices = len(centers[0])
     n_b0_values = len(centers)
     mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
@@ -63,30 +63,6 @@ def fit_line_to_phase2(fixed_inputs, B1, G, centers, half_width):
     return best_slope * x, phases, best_slope
 
 
-def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width, count_slices_with_algorithm=False):
-    n_slices = len(centers[0])
-    n_b0_values = len(centers)
-    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
-    fitted_lines = []
-    phases = []
-    slopes = []
-    for ff in range(mxy.shape[0]):
-        phase = np.unwrap(np.angle(mxy[ff, :]))
-        fitted_line = np.zeros_like(phase)
-
-        (centers_comp, half_width_comp), success = count_slices(np.abs(mxy[ff, :]))
-        if count_slices_with_algorithm:
-            print("SLICES COUNTED!!!")
-            slope, fitted_line, phase = fit_lines(phase, half_width_comp, centers_comp, n_slices, fitted_line)
-        else:
-            slope, fitted_line, phase = fit_lines(phase, half_width, centers[ff], n_slices, fitted_line)
-        slopes.append(slope)
-        fitted_lines.append(fitted_line)
-        phases.append(phase)
-
-    return fitted_lines, phases, slopes
-
-
 def fit_lines(phase, half_width, centers_loc, n_slices, fitted_line):
     allPhases = np.zeros((2 * half_width + 1))
     x = np.arange(-half_width, half_width + 1, dtype=np.float32) / (2 * half_width) * 0.02
@@ -105,9 +81,9 @@ def fit_lines(phase, half_width, centers_loc, n_slices, fitted_line):
     return slope, fitted_line, phase
 
 
-def plot_phase_fit_error2(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
+def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
     n_b0_values = len(centers_allB0)
-    fitted_line, phases, slope = fit_line_to_phase2(fixed_inputs, B1, G, centers_allB0, half_width)
+    fitted_line, phases, slope = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width)
     freq_offsets_ppm = torch.linspace(-water_ppm, 0.0, n_b0_values)
     cmap = cm.get_cmap("inferno", n_b0_values + 1)
     colors = [cmap(i) for i in range(n_b0_values)]
@@ -127,35 +103,4 @@ def plot_phase_fit_error2(fixed_inputs, B1, G, centers_allB0, half_width, path=N
         filename = "phase_error_on_targets.png"
         fig.savefig(os.path.join(os.path.dirname(path), filename), dpi=300)
 
-    return [slope] * n_b0_values
-
-
-def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm=False, path=None):
-    n_b0_values = len(centers_allB0)
-    fitted_lines, phases, slopes = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width, count_slices_with_algorithm)
-    freq_offsets_ppm = torch.linspace(-water_ppm, 0.0, n_b0_values)
-    cmap = cm.get_cmap("inferno", n_b0_values + 1)
-    colors = [cmap(i) for i in range(n_b0_values)]
-
-    where_slices_are = np.zeros((n_b0_values, phases[0].shape[0]))
-    for i, centers in enumerate(centers_allB0):
-        for center in centers:
-            where_slices_are[i, center - half_width : center + half_width] = 1
-    fig, ax = plt.subplots(figsize=(10, 5))
-    for i, fitted_line in enumerate(fitted_lines):
-        error = phases[i] - fitted_line
-        error[~where_slices_are[i].astype(bool)] = np.nan
-        plt.plot(fixed_inputs["pos"], error, linewidth=0.8, label=f"{freq_offsets_ppm[i]:.1f} ppm", color=colors[i])
-    zero = fixed_inputs["pos"] * 0.0
-    zero[~where_slices_are.astype(bool).all(axis=0)] = np.nan
-    plt.plot(fixed_inputs["pos"], zero, linewidth=0.8, color="black", linestyle="dotted")
-    plt.title("Phase Fitting and Error")
-    plt.xlabel("pos")
-    plt.ylabel("Phase Value")
-    plt.legend()
-
-    if path is not None:
-        filename = "phase_error_on_slices.png" if count_slices_with_algorithm else "phase_error_on_targets.png"
-        fig.savefig(os.path.join(os.path.dirname(path), filename), dpi=300)
-
-    return slopes
+    return slope
