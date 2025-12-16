@@ -128,7 +128,8 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
         ax[1, 1].plot(pos, mxy_abs, linewidth=0.8)
         ax[1, 1].plot(pos, target_xy[ff, :], linewidth=0.8)
 
-        phase = np.unwrap(np.angle(mxy[ff, :]))
+        # phase = np.unwrap(np.angle(mxy[ff, :]))
+        phase = np.angle(mxy[ff, :])
         phasemin = np.inf
         phasemax = -np.inf
         slice_centers_current_b0 = slice_centers_allB0[ff]

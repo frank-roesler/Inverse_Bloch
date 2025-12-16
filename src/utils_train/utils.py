@@ -131,8 +131,8 @@ class InfoScreen:
         self.ax[2].set_title("Loss")
         self.ax_bottom_left.set_title("M_z")
         self.ax_bottom_right.set_title("M_xy")
-        self.ax[0].legend()
-        self.ax[1].legend()
+        self.ax[0].legend(fontsize="small")
+        self.ax[1].legend(fontsize="small")
         plt.show(block=False)
 
     def plot_info(self, step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainlogger, where_slices_are):
@@ -242,7 +242,26 @@ class SliceProfileLoss(torch.nn.Module):
         self.scanner_params = sconfig.scanner_params
         self.posAx = bconfig.fixed_inputs["pos"].to(target_xy.device)
         self.delta_t = bconfig.fixed_inputs["dt_num"]
-        self.where_slices_are = target_xy > 1e-3
+        self.n_slices = bconfig.n_slices
+        self.slices_mask = target_xy > 1e-3
+        self.slice_indices = self.compute_slice_indices()
+
+    def compute_slice_indices(self):
+        slice_indices = []
+        for b in range(self.slices_mask.shape[0]):
+            currently_in_slice = False
+            slice_indices_current_b0 = []
+            current_slice_indices_current_b0 = []
+            for i, z in enumerate(self.slices_mask[b, :]):
+                if z:
+                    currently_in_slice = True
+                    current_slice_indices_current_b0.append(i)
+                elif currently_in_slice:
+                    slice_indices_current_b0.append(current_slice_indices_current_b0)
+                    current_slice_indices_current_b0 = []
+                    currently_in_slice = False
+            slice_indices.append(slice_indices_current_b0)
+        return slice_indices
 
     def compute_profile_loss(self, xy_profile, z_profile, target_xy, target_z):
         """Computes approximation error between slice profile and target in L1 or L2 norm"""
@@ -294,28 +313,31 @@ class SliceProfileLoss(torch.nn.Module):
         """Enforces linearity of phase on slices"""
         phase_diff, dx = self.compute_phase_diff(phase, self.posAx)
         phase_ddiff = torch.diff(phase_diff) / dx
-        phase_ddiff = torch.mean(phase_ddiff[self.where_slices_are[:, 1:-1]] ** 2, dim=-1)
+        phase_ddiff = torch.mean(phase_ddiff[self.slices_mask[:, 1:-1]] ** 2, dim=-1)
         return phase_diff, phase_ddiff
 
     def compute_phase_diff_var_loss(self, phase_diff):
         """Enforces equal slope pf phase in all slices"""
-        phase_diff_var = torch.var(phase_diff[self.where_slices_are[:, :-1]], dim=-1)
+        phase_diff_var = torch.var(phase_diff[self.slices_mask[:, :-1]], dim=-1)
         return phase_diff_var
 
     def compute_phase_B0_diff(self, phase):
         """When training multiple B0 values at once, this loss penalizes large variation of the phase in B0 direction"""
-        slice_cover = torch.any(self.where_slices_are, dim=0)
-        phase_slice = phase[:, slice_cover]
-        phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phase_slice, dim=0) ** 2)
+        phases_slices = phase * self.slices_mask
+        means_slices = torch.zeros((self.slices_mask.shape[0], self.n_slices))
+        for b, slices_b in enumerate(self.slice_indices):
+            for n_slice, idx_slice in enumerate(slices_b):
+                means_slices[b, n_slice] = torch.mean(torch_unwrap(phases_slices[b, idx_slice]))
+        phase_B0_diff = phase.shape[0] * torch.mean(torch.diff(phases_slices, dim=0) ** 2)
         return phase_B0_diff
 
     def compute_phase_offset_loss(self, phase):
         """Enforces phase offset of 180º between slices. Only works with 2 slices"""
-        left = torch.zeros_like(self.where_slices_are)
+        left = torch.zeros_like(self.slices_mask)
         left[:, self.posAx < 0] = 1
         right = ~left
-        leftPeak = self.where_slices_are * left
-        rightPeak = self.where_slices_are * right
+        leftPeak = self.slices_mask * left
+        rightPeak = self.slices_mask * right
         phase_left = phase * leftPeak
         phase_right = phase * rightPeak
         phase_left = torch.trapz(phase_left, self.posAx, dim=1) / torch.trapz(1.0 * leftPeak, self.posAx, dim=1)
@@ -325,7 +347,7 @@ class SliceProfileLoss(torch.nn.Module):
 
     def compute_phase_diff_loss(self, phase_diff):
         """Penalizes slope of phase on slices. Thereby enforces self-refocusoing"""
-        phase_diff_loss = torch.mean(phase_diff[:, self.where_slices_are[:-1]] ** 2, dim=-1)
+        phase_diff_loss = torch.mean(phase_diff[:, self.slices_mask[:-1]] ** 2, dim=-1)
         return phase_diff_loss
 
     def forward(self, z_profile, xy_profile, target_z, target_xy, pulse, gradient):
@@ -558,7 +580,7 @@ def train(model, target_z, target_xy, optimizer, scheduler, losses, device, tcon
 
         with torch.no_grad():
             trainLogger.log_step(step, losses, model, optimizer)
-            infoscreen.plot_info(step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.where_slices_are)
+            infoscreen.plot_info(step, losses, target_z, target_xy, mz, mxy, pulse, gradient, trainLogger, loss_fn.slices_mask)
             infoscreen.print_info(step, currentLossItems, optimizer, trainLogger.best_loss)
 
         optimizer.zero_grad()
