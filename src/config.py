@@ -87,6 +87,7 @@ class TrainingConfig(InputData):
         self.suppress_loss_peaks = data_dict["suppress_loss_peaks"]
         self.loss_metric = data_dict["loss_metric"]
         self.loss_weights = data_dict["loss_weights"]
+        self.phase_offset_in_rad = data_dict["phase_offset_in_rad"]
 
     def to_dict(self):
         out_dict = {}
@@ -102,6 +103,7 @@ class TrainingConfig(InputData):
         out_dict["suppress_loss_peaks"] = self.suppress_loss_peaks
         out_dict["loss_metric"] = self.loss_metric
         out_dict["loss_weights"] = self.loss_weights
+        out_dict["phase_offset_in_rad"] = self.phase_offset_in_rad
         return out_dict
 
 

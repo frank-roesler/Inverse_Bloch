@@ -36,5 +36,5 @@ def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512)
 
 
 if __name__ == "__main__":
-    path = "results/2025-12-16_11-16/train_log.pt"
-    forward(path, npts_some_b0_values=8, Nz=512, Nt=128, npts_off_resonance=512)
+    path = "results/2025-12-17_12-54/train_log.pt"
+    forward(path, npts_some_b0_values=8, Nz=2048, Nt=256, npts_off_resonance=512)
