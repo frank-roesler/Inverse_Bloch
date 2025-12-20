@@ -1,9 +1,7 @@
 aux/*
 .venv/*
 venv/*
-*/__pycache__/*
-*/*/__pycache__/*
-__pycache__/*
+__pycache__/
 .vscode/*
 auxiliary/*
 results/*

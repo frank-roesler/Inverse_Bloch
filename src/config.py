@@ -118,6 +118,9 @@ class BlochConfig(InputData):
         self.Nz = data_dict["Nz"]
         self.Nt = data_dict["Nt"]
         self.pos_spacing = data_dict["pos_spacing"]
+        self.set_fixed_inputs()
+
+    def set_fixed_inputs(self):
         self.fixed_inputs = get_fixed_inputs(tfactor=self.tfactor, n_b0_values=self.n_b0_values, Nz=self.Nz, Nt=self.Nt, pos_spacing=self.pos_spacing, n_slices=self.n_slices)
 
     def to_dict(self):
