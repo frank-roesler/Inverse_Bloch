@@ -251,6 +251,16 @@ class SliceProfileLoss(torch.nn.Module):
         self.slices_mask = 1.0 * (target_xy > 1e-3)
         self.slice_indices = self.compute_slice_indices()
         self.target_phase_offset = tconfig.phase_offset_in_rad
+        self.mxy_desired = self.loss_desired("loss_mxy")
+        self.mz_desired = self.loss_desired("loss_mz")
+        self.boundary_vals_pulse_desired = self.loss_desired("boundary_vals_pulse")
+        self.gradient_height_desired = self.loss_desired("gradient_height_loss")
+        self.pulse_height_desired = self.loss_desired("pulse_height_loss")
+        self.gradient_diff_desired = self.loss_desired("gradient_diff_loss")
+        self.phase_B0_diff_desired = self.loss_desired("phase_B0_diff")
+        self.phase_diff_desired = self.loss_desired("phase_diff")
+        self.phase_diff_var_desired = self.loss_desired("phase_diff_var_loss")
+        self.phase_offset_desired = self.loss_desired("phase_offset_loss")
 
     def compute_slice_indices(self):
         slice_indices = []
@@ -367,31 +377,30 @@ class SliceProfileLoss(torch.nn.Module):
         return key in self.loss_weights and self.loss_weights[key] > 0
 
     def forward(self, z_profile, xy_profile, target_z, target_xy, pulse, gradient):
-        # TODO: Change code so that only toml has to be edited to remove individual losses
         step_losses = {}
-        if self.loss_desired("loss_mxy"):
+        if self.mxy_desired:
             step_losses["loss_mxy"] = self.loss_weights["loss_mxy"] * self.compute_loss_mxy(xy_profile, target_xy)
-        if self.loss_desired("loss_mz"):
+        if self.mz_desired:
             step_losses["loss_mz"] = self.loss_weights["loss_mz"] * self.compute_loss_mz(z_profile, target_z)
-        if self.loss_desired("boundary_vals_pulse"):
+        if self.boundary_vals_pulse_desired:
             step_losses["boundary_vals_pulse"] = self.loss_weights["boundary_vals_pulse"] * self.compute_boundary_loss(pulse)
-        if self.loss_desired("gradient_height_loss"):
+        if self.gradient_height_desired:
             step_losses["gradient_height_loss"] = self.loss_weights["gradient_height_loss"] * self.compute_gradient_height_loss(gradient, self.scanner_params["max_gradient"])
-        if self.loss_desired("pulse_height_loss"):
+        if self.pulse_height_desired:
             step_losses["pulse_height_loss"] = self.loss_weights["pulse_height_loss"] * self.compute_pulse_height_loss(pulse, self.scanner_params["max_pulse_amplitude"])
-        if self.loss_desired("gradient_diff_loss"):
+        if self.gradient_diff_desired:
             step_losses["gradient_diff_loss"] = self.loss_weights["gradient_diff_loss"] * self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
         phase = torch.angle(xy_profile)
-        if self.loss_desired("phase_B0_diff"):
+        if self.phase_B0_diff_desired:
             step_losses["phase_B0_diff"] = self.loss_weights["phase_B0_diff"] * self.compute_phase_B0_diff(phase)
         phase = torch_unwrap(phase)
         phase_diff = self.compute_phase_diff(phase)
-        if self.loss_desired("phase_diff"):
-            step_losses["phase_diff"] = self.loss_weights["phase_diff"] * torch.mesn(phase_diff**2)
-        if self.loss_desired("phase_diff_var_loss"):
+        if self.phase_diff_desired:
+            step_losses["phase_diff"] = self.loss_weights["phase_diff"] * torch.mean(phase_diff**2)
+        if self.phase_diff_var_desired:
             step_losses["phase_diff_var_loss"] = self.loss_weights["phase_diff_var_loss"] * self.compute_phase_diff_var_loss(phase_diff)
-        if self.loss_desired("phase_offset_loss"):
+        if self.phase_offset_desired:
             step_losses["phase_offset_loss"] = self.loss_weights["phase_offset_loss"] * self.compute_phase_offset_loss(phase)
 
         if self.verbose:

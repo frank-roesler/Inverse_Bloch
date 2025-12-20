@@ -21,14 +21,14 @@ This repository provides tools for training, simulating, and analyzing RF pulse 
 
 - **forward.py**: Run inference with a trained model, generate and plot results.
 - **backward.py**: Main training script for neural network models.
-- **params.py**: Central configuration for training and simulation parameters.
+- **params.toml**: Central configuration for training and simulation parameters.
 - **requirements.txt**: Python dependencies.
 - **README.md**: Project overview and instructions (this file).
 
 ### Submodules
-- **utils_train/**: Training utilities, model definitions, logging, and plotting during training.
-- **utils_bloch/**: Bloch simulation routines, batch processing, and related utilities.
-- **utils_infer/**: Inference and analysis utilities, including plotting and parameter export.
+- **src/utils_train/**: Training utilities, model definitions, logging, and plotting during training.
+- **src/utils_bloch/**: Bloch simulation routines, batch processing, and related utilities.
+- **src/utils_infer/**: Inference and analysis utilities, including plotting and parameter export.
 - **data/**: Input data and literature references.
 - **results/**: Output folders for training logs, plots, and exported parameters.
 
@@ -71,7 +71,7 @@ export_param_csv(input_path, output_path)
 - Training and inference results are saved in timestamped folders under `results/`.
 
 ## Requirements
-- Python 3.8+
+- Python 3.11+
 - PyTorch
 - NumPy
 - Matplotlib
