@@ -188,6 +188,8 @@ class InfoScreen:
                 currentMin = 0.5 * np.min(losses[key][-2000:])
                 if currentMin > 1e-6:
                     minLoss = min(minLoss, currentMin)
+                else:
+                    minLoss = 1e-6
             maxLoss = 2 * np.max(losses["total"][-2000:])
 
             self.ax_bottom_left.set_xlim(fmin, fmax)
@@ -200,8 +202,8 @@ class InfoScreen:
             self.ax_bottom_right.set_ylim(-0.1, 1.1)
             self.ax_phase.set_ylim(phasemin, phasemax)
             self.ax[0].set_ylim((-np.max(pulse_abs), np.max(pulse_abs)))
-            self.ax[2].set_ylim((minLoss, maxLoss))
             self.ax[1].set_ylim((-1.1 * np.max(np.abs(gradient_for_plot)).item(), 1.1 * np.max(np.abs(gradient_for_plot)).item()))
+            self.ax[2].set_ylim((minLoss, maxLoss))
 
             self.fig.canvas.draw_idle()
             if trainlogger.new_optimum:
@@ -267,22 +269,28 @@ class SliceProfileLoss(torch.nn.Module):
             slice_indices.append(slice_indices_current_b0)
         return slice_indices
 
-    def compute_profile_loss(self, xy_profile, z_profile, target_xy, target_z):
+    def compute_loss_mxy(self, xy_profile, target_xy):
         """Computes approximation error between slice profile and target in L1 or L2 norm"""
         xy_profile_abs = torch.abs(xy_profile)
         if self.metric == "L2":
-            loss_mxy = torch.trapz((xy_profile_abs - target_xy) ** 2, self.posAx, dim=1).mean(dim=0)
-            loss_mz = torch.trapz((z_profile - target_z) ** 2, self.posAx, dim=1).mean(dim=0)
-            # if loss_mxy < 0.04:
-            #     where_peaks_are = xy_profile_abs > 0.5
+            integrand = (xy_profile_abs - target_xy) ** 2
         elif self.metric == "L1":
-            loss_mxy = torch.trapz(torch.abs(xy_profile_abs - target_xy), self.posAx, dim=1).mean(dim=0)
-            loss_mz = torch.trapz(torch.abs(z_profile - target_z), self.posAx, dim=1).mean(dim=0)
-            # if loss_mxy < 0.11:
-            #     where_peaks_are = xy_profile_abs > 0.5
+            integrand = torch.abs(xy_profile_abs - target_xy)
         else:
             raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
-        return loss_mxy / self.pos_extent, loss_mz / self.pos_extent
+        loss_mxy = torch.trapz(integrand, self.posAx, dim=1).mean(dim=0)
+        return loss_mxy / self.pos_extent
+
+    def compute_loss_mz(self, z_profile, target_z):
+        """Computes approximation error between slice profile and target in L1 or L2 norm"""
+        if self.metric == "L2":
+            integrand = (z_profile - target_z) ** 2
+        elif self.metric == "L1":
+            integrand = torch.abs(z_profile - target_z)
+        else:
+            raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
+        loss_mz = torch.trapz(integrand, self.posAx, dim=1).mean(dim=0)
+        return loss_mz / self.pos_extent
 
     def compute_boundary_loss(self, pulse):
         """Penalizes boundary values of the pulse at start and end"""
@@ -355,33 +363,36 @@ class SliceProfileLoss(torch.nn.Module):
         phase_diff_loss = torch.trapz((phase_diff * self.slices_mask[:, :-1]) ** 2, self.posAx_mid, dim=-1) / torch.trapz(self.slices_mask, self.posAx, dim=-1)
         return phase_diff_loss.mean()
 
+    def loss_desired(self, key):
+        return key in self.loss_weights and self.loss_weights[key] > 0
+
     def forward(self, z_profile, xy_profile, target_z, target_xy, pulse, gradient):
         # TODO: Change code so that only toml has to be edited to remove individual losses
-        loss_mxy, loss_mz = self.compute_profile_loss(xy_profile, z_profile, target_xy, target_z)
-        boundary_vals_pulse = self.compute_boundary_loss(pulse)
-        gradient_height_loss = self.compute_gradient_height_loss(gradient, self.scanner_params["max_gradient"])
-        pulse_height_loss = self.compute_pulse_height_loss(pulse, self.scanner_params["max_pulse_amplitude"])
-        gradient_diff_loss = self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
+        step_losses = {}
+        if self.loss_desired("loss_mxy"):
+            step_losses["loss_mxy"] = self.loss_weights["loss_mxy"] * self.compute_loss_mxy(xy_profile, target_xy)
+        if self.loss_desired("loss_mz"):
+            step_losses["loss_mz"] = self.loss_weights["loss_mz"] * self.compute_loss_mz(z_profile, target_z)
+        if self.loss_desired("boundary_vals_pulse"):
+            step_losses["boundary_vals_pulse"] = self.loss_weights["boundary_vals_pulse"] * self.compute_boundary_loss(pulse)
+        if self.loss_desired("gradient_height_loss"):
+            step_losses["gradient_height_loss"] = self.loss_weights["gradient_height_loss"] * self.compute_gradient_height_loss(gradient, self.scanner_params["max_gradient"])
+        if self.loss_desired("pulse_height_loss"):
+            step_losses["pulse_height_loss"] = self.loss_weights["pulse_height_loss"] * self.compute_pulse_height_loss(pulse, self.scanner_params["max_pulse_amplitude"])
+        if self.loss_desired("gradient_diff_loss"):
+            step_losses["gradient_diff_loss"] = self.loss_weights["gradient_diff_loss"] * self.compute_gradient_diff_loss(gradient, self.scanner_params["max_diff_gradient"] * self.delta_t * 1000)
 
         phase = torch.angle(xy_profile)
-        # phase_B0_diff = self.compute_phase_B0_diff(phase)
+        if self.loss_desired("phase_B0_diff"):
+            step_losses["phase_B0_diff"] = self.loss_weights["phase_B0_diff"] * self.compute_phase_B0_diff(phase)
         phase = torch_unwrap(phase)
         phase_diff = self.compute_phase_diff(phase)
-        phase_diff_var = self.compute_phase_diff_var_loss(phase_diff)
-        phase_offset = self.compute_phase_offset_loss(phase)
-
-        step_losses = {
-            "loss_mxy": self.loss_weights["loss_mxy"] * loss_mxy,
-            "loss_mz": self.loss_weights["loss_mz"] * loss_mz,
-            "boundary_vals_pulse": self.loss_weights["boundary_vals_pulse"] * boundary_vals_pulse,
-            "gradient_height_loss": self.loss_weights["gradient_height_loss"] * gradient_height_loss,
-            "pulse_height_loss": self.loss_weights["pulse_height_loss"] * pulse_height_loss,
-            "gradient_diff_loss": self.loss_weights["gradient_diff_loss"] * gradient_diff_loss,
-            "phase_diff_var": self.loss_weights["phase_diff_var"] * phase_diff_var,
-            # "phase_diff": self.loss_weights["phase_diff"] * self.compute_phase_diff_loss(phase_diff),
-            # "phase_B0_diff": self.loss_weights["phase_B0_diff"] * phase_B0_diff,
-            "phase_offset": self.loss_weights["phase_offset"] * phase_offset,
-        }
+        if self.loss_desired("phase_diff"):
+            step_losses["phase_diff"] = self.loss_weights["phase_diff"] * torch.mesn(phase_diff**2)
+        if self.loss_desired("phase_diff_var_loss"):
+            step_losses["phase_diff_var_loss"] = self.loss_weights["phase_diff_var_loss"] * self.compute_phase_diff_var_loss(phase_diff)
+        if self.loss_desired("phase_offset_loss"):
+            step_losses["phase_offset_loss"] = self.loss_weights["phase_offset_loss"] * self.compute_phase_offset_loss(phase)
 
         if self.verbose:
             print("-" * 50)
@@ -458,7 +469,7 @@ def init_training(tconfig, model, lr, device=torch.device("cpu")):
             amsgrad=True,
         )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=500, min_lr=1e-6)
-    losses = {key: [] for key in tconfig.loss_weights.keys()}
+    losses = {key: [] for key, value in tconfig.loss_weights.items() if value > 0}
     losses["total"] = []
     return model, optimizer, scheduler, losses
 
@@ -469,7 +480,7 @@ def threshold_loss(x, threshold):
     return threshold_loss**2
 
 
-def load_data(path, mode="inference", device="cpu"):
+def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     from utils_bloch.setup import get_smooth_targets
 
     data_dict = torch.load(path, weights_only=False, map_location=device)
@@ -479,7 +490,7 @@ def load_data(path, mode="inference", device="cpu"):
     model = data_dict["model"]
     optimizer = data_dict["optimizer"]
     tconfig = data_dict["tconfig"]
-    bconfig = data_dict["bconfig"]
+    bconfig = data_dict["bconfig"] if bconfig_override == None else bconfig_override
     mconfig = data_dict["mconfig"]
     sconfig = data_dict["sconfig"]
     target_z, target_xy, slice_centers, half_width = get_smooth_targets(tconfig, bconfig)
@@ -505,11 +516,6 @@ def torch_unwrap(phase, discont=torch.pi):
     diff_mod[diff_mod == -torch.pi] = torch.pi
     phase_unwrapped = torch.cumsum(torch.cat((phase[..., :1], diff_mod), dim=-1), dim=-1)
     return phase_unwrapped
-
-
-def central_modulo(x):
-    shift = np.pi - x % (2 * np.pi) / 2
-    return (x + shift) % (2 * np.pi) - shift
 
 
 def regularization_factor(x, threshold=1):

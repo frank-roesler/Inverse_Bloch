@@ -19,6 +19,6 @@ model, optimizer, scheduler, losses = init_training(tconfig, model, tconfig.lr, 
 
 if tconfig.resume_from_path != "":
     tconfig.pre_train_inputs = False
-    (model, target_z, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig) = load_data(tconfig.resume_from_path, mode="train")
+    (model, target_z, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig) = load_data(tconfig.resume_from_path, mode="train", bconfig_override=bconfig)
 
 train(model, target_z, target_xy, optimizer, scheduler, losses, device, tconfig, bconfig, mconfig, sconfig)

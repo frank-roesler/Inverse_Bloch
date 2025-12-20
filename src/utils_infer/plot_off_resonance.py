@@ -86,7 +86,7 @@ def plot_off_resonance(
     # Adjust layout and show the plot
     plt.tight_layout()
     if path is not None:
-        np.save(os.path.join(os.path.dirname(path), "phase.npy"), phase)
+        # np.save(os.path.join(os.path.dirname(path), "phase.npy"), phase)
         fig.savefig(os.path.join(os.path.dirname(path), "freqprof.png"), dpi=300)
 
 

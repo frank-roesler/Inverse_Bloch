@@ -3,14 +3,14 @@ start_step = 0
 target_smoothness = 4.0
 shift_targets = false
 steps = 100000
-resume_from_path = "" 
+resume_from_path = ""
 lr = { pulse = 1e-5, gradient = 1e-5 } # learning rates
 plot_loss_frequency = 20
 start_logging = 1000
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"
-phase_offset_in_rad = 1.5707963267948966 # [-pi,pi]
+phase_offset_in_rad = -1.5707963267948966 # [-pi,pi]
 
 # BLOCH PARAMETERS:
 n_slices = 2
@@ -18,7 +18,7 @@ n_b0_values = 5 # needs to be odd when shift_targets == true
 flip_angle = 1.5707963267948966 # pi/2
 tfactor = 2 # pulse time is 0.64ms * tfactor
 Nz = 512 # number of mesh points in pos axis
-Nt = 64 # number of mesh points per 0.64ms time interval
+Nt = 128 # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
 
 # MODEL PARAMETERS:
@@ -31,10 +31,10 @@ boundary_vals_pulse = 100.0
 gradient_height_loss = 0.1
 pulse_height_loss = 1000.0
 gradient_diff_loss = 1.0
-phase_diff_var = 1e-7
-# phase_diff = 1e-6
-# phase_B0_diff = 1e-5
-phase_offset = 1e-2 # only works for 2 slices
+phase_diff_var_loss = 1e-8
+phase_diff = 0
+phase_B0_diff = 0
+phase_offset_loss = 1e-2 # only works for 2 slices
 
 [model_args]
 n_coeffs = 50 # Fourier Series

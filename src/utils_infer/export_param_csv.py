@@ -37,8 +37,7 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     phase_offsets_all_b0 = []
     for ff in range(len(freq_offsets_Hz)):
-        phase = np.unwrap(np.angle(mxy[ff, :]))
-        phase_offsets_all_b0.append(compute_phase_offsets(phase, slice_centers_allB0[ff], half_width))
+        phase_offsets_all_b0.append(compute_phase_offsets(mxy[ff, :], slice_centers_allB0[ff], half_width))
     return phase_offsets_all_b0
 
 
