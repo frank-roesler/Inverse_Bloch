@@ -23,27 +23,31 @@ def simulate_B0_values(fixed_inputs, B1, G, n_b0_values=3):
 def count_slices(abs_mxy):
     """Attempts to count the actual slices from the profile m_xy by computing intersection points with a constant line at 0.5.
     If the number of intersection points is not even, the procedure is deemed unsuccessful."""
+    n_b0_values = abs_mxy.shape[0]
     abs_mxy = np.clip(abs_mxy, 0.4, 0.6).numpy()
-    argmins = argrelextrema(np.abs(abs_mxy - 0.5), np.less)[0]
-    if not len(argmins) % 2 == 0:
+    argmins = argrelextrema(np.abs(abs_mxy - 0.5), np.less, axis=1)
+    if not len(argmins[0]) % (2 * n_b0_values) == 0:
         return (([], []), False)
-    centers = [(argmins[i].item() + argmins[i + 1].item()) // 2 for i in 2 * np.arange(len(argmins) // 2)]
-    half_widths = [(argmins[i + 1] - argmins[i]) / 2 for i in 2 * np.arange(len(argmins) // 2)]
-    half_width = int(np.mean(half_widths).item())
-    return ((centers, half_width), True)
+    n_slices = len(argmins[0]) // (2 * n_b0_values)
+    centers = np.zeros((n_b0_values, n_slices))
+    half_widths = np.zeros((n_b0_values, n_slices))
+    for b, s in zip(list(argmins[0]), list(range(len(argmins[1]) // 2)) * 2):
+        centers[b, s % n_slices] = (argmins[1][2 * s] + argmins[1][2 * s + 1]) // 2
+        half_widths[b, s % n_slices] = (argmins[1][2 * s + 1] - argmins[1][2 * s]) // 2
+
+    half_width = int(np.min(half_widths).item())
+    return ((centers.astype(np.int32), half_width), True)
 
 
-def fit_line_to_phase(fixed_inputs, B1, G, centers, half_width):
-    n_slices = len(centers[0])
-    n_b0_values = len(centers)
-    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
+def fit_line_to_phase(mxy, centers, half_width):
+    n_slices = centers.shape[1]
     phases = []
     slopes = []
     x = np.arange(-half_width, half_width + 1, dtype=np.float32) / (2 * half_width) * 0.02
     for ff in range(mxy.shape[0]):
         phase = np.unwrap(np.angle(mxy[ff, :]))
         for i in range(n_slices):
-            center = centers[ff][i]
+            center = centers[ff, i]
             start = max(center - half_width, 0)
             end = min(center + half_width, len(phase) - 1)
             current_phase = phase[start : end + 1] - np.mean(phase[start : end + 1])
@@ -81,9 +85,18 @@ def fit_lines(phase, half_width, centers_loc, n_slices, fitted_line):
     return slope, fitted_line, phase
 
 
-def plot_phase_fit_error(fixed_inputs, B1, G, centers_allB0, half_width, path=None):
-    n_b0_values = len(centers_allB0)
-    fitted_line, phases, slope = fit_line_to_phase(fixed_inputs, B1, G, centers_allB0, half_width)
+def plot_phase_fit_error(fixed_inputs, target_xy, B1, G, path=None):
+    n_b0_values = target_xy.shape[0]
+    mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
+
+    (slice_centers, half_width), success = count_slices(mxy.abs())
+    if not success:
+        slice_mask = target_xy > 0.5
+        slice_centers = torch.sum(slice_mask * torch.arange(slice_mask.shape[1]).unsqueeze(-1), dim=1) / slice_mask.sum(dim=1)
+        slice_centers = slice_centers.long()
+        half_width = (torch.sum(slice_mask[0, :, :].sum(dim=-1)) / slice_mask.shape[-1] / 2).long().item()
+
+    fitted_line, phases, slope = fit_line_to_phase(mxy, slice_centers, half_width)
     freq_offsets_ppm = torch.linspace(-water_ppm, 0.0, n_b0_values)
     cmap = cm.get_cmap("inferno", n_b0_values + 1)
     colors = [cmap(i) for i in range(n_b0_values)]
