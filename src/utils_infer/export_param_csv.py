@@ -33,11 +33,18 @@ def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
 
     B0 = torch.stack(B0_list, dim=0).to(torch.float32)
     mxy, mz = blochsim_CK_batch(B1=B1, G=G, pos=pos, sens=fixed_inputs["sens"], B0_list=B0, M0=fixed_inputs["M0"], dt=fixed_inputs["dt_num"])
-    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
+    target_xy = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
+    target_z = torch.sqrt(1 - target_xy.sum(dim=-1) ** 2)
+
+    slice_mask = target_xy > 0.5
+    slice_centers = torch.sum(slice_mask * torch.arange(slice_mask.shape[1]).unsqueeze(-1), dim=1) / slice_mask.sum(dim=1)
+    slice_centers = slice_centers.long()
+    half_width = (torch.sum(slice_mask[0, :, :].sum(dim=-1)) / slice_mask.shape[-1] / 2).long().item()
+
     (mxy, mz, pos, target_xy, target_z, t_B1, G, B1) = move_to((mxy, mz, pos, target_xy, target_z, t_B1, G, B1), torch.device("cpu"))
     phase_offsets_all_b0 = []
     for ff in range(len(freq_offsets_Hz)):
-        phase_offsets_all_b0.append(compute_phase_offsets(mxy[ff, :], slice_centers_allB0[ff], half_width))
+        phase_offsets_all_b0.append(compute_phase_offsets(mxy[ff, :], slice_centers[ff, :], half_width))
     return phase_offsets_all_b0
 
 

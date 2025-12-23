@@ -5,14 +5,22 @@ import matplotlib.pyplot as plt
 import os
 
 
-def plot_timeprof(B1, G, fixed_inputs, slice_centers, half_width, path=None):
-    n_b0_values = len(slice_centers)
-    freq_offsets_ppm = torch.linspace(-4.7, 0.0, n_b0_values)
+def plot_timeprof(B1, G, fixed_inputs, target_xy, path=None):
+    n_b0_values = target_xy.shape[0]
+
+    slice_mask = target_xy > 0.5
+    slice_centers = torch.sum(slice_mask * torch.arange(slice_mask.shape[1]).unsqueeze(-1), dim=1) / slice_mask.sum(dim=1)
+    slice_centers = slice_centers.long()
+    half_width = (torch.sum(slice_mask[0, :, :].sum(dim=-1)) / slice_mask.shape[-1] / 2).long().item()
+
+    for b in range(n_b0_values):
+        freq_offsets_ppm = torch.linspace(-4.7, 0.0, n_b0_values)
 
     cmap = cm.get_cmap("inferno", len(slice_centers[0]) + 2)
     colors = [cmap(i + 1) for i in range(len(slice_centers[0]))]
     mxy, mz = blochsim_CK_timeprofile(B1, G, **fixed_inputs)
-    for b, centers in enumerate(slice_centers):
+    for b in range(slice_centers.shape[0]):
+        centers = slice_centers[b, :]
         fig, ax = plt.subplots(figsize=(12, 6))
         fig.suptitle(f"B0: {freq_offsets_ppm[b].item():.1f} ppm", fontsize=16)
         for i, c in enumerate(centers):

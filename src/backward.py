@@ -13,7 +13,7 @@ mconfig = ModelConfig(bconfig.fixed_inputs["t_B1"], config_path)
 sconfig = ScannerConfig(config_path)
 
 
-target_z, target_xy, _, _ = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid)
+target_xy = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid)
 model = get_model(mconfig)
 model, optimizer, scheduler, losses = init_training(tconfig, model, tconfig.lr, device=device)
 
@@ -21,4 +21,4 @@ if tconfig.resume_from_path != "":
     tconfig.pre_train_inputs = False
     (model, target_z, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig) = load_data(tconfig.resume_from_path, mode="train", bconfig_override=bconfig)
 
-train(model, target_z, target_xy, optimizer, scheduler, losses, device, tconfig, bconfig, mconfig, sconfig)
+train(model, target_xy, optimizer, scheduler, losses, device, tconfig, bconfig, mconfig, sconfig)

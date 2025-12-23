@@ -22,29 +22,26 @@ def circshift(x, shift):
 
 
 def get_smooth_targets(train_config, bloch_config, function=torch.sigmoid, override_inputs=None):
-    """higher smoothness values give sharper transitions"""
-
+    """Creates target |Mxy| and Mz profiles. Mz profile is real, while |Mxy| profile is artificially made complex to encode
+    the slice number. Each slice is multiplied by a different complex root of unity. The actual profile is obtained by taking
+    abs(target_xy).
+    - train_config.target_smoothness: Higher values give sharper transitions
+    - train_config.shift_targets: If true, shifts target profiles for different B0 offsets to reflect chemical shift
+    """
     smoothness = train_config.target_smoothness * 1000.0
     width = 0.02
     distance = 0.01
-    shift = 0.002 if train_config.shift_targets else 0.0
+    shift = 0.001 if train_config.shift_targets else 0.0
 
     pos = bloch_config.fixed_inputs["pos"] if override_inputs is None else override_inputs["pos"]
-    pos0 = np.argmin(np.abs(pos)).item()
-    posAtWidth = np.argmin(np.abs(pos - width / 2)).item()
-    half_width = posAtWidth - pos0
 
-    targets_xy = []
-    centers = []
+    target_xy = torch.zeros((bloch_config.n_b0_values, pos.shape[0], bloch_config.n_slices), dtype=torch.float32, requires_grad=False)
     minShift = bloch_config.n_b0_values // 2
-    for i in range(-minShift, minShift + 1):
-
-        left = -0.5 * (width * bloch_config.n_slices + distance * (bloch_config.n_slices - 1)) - i * shift
-
-        target_xy = torch.zeros(pos.shape, dtype=torch.float32, requires_grad=False)
+    for b in range(-minShift, minShift + 1):
+        left = -0.5 * (width * bloch_config.n_slices + distance * (bloch_config.n_slices - 1)) - b * shift
         centers_loc = []
-        for i in range(bloch_config.n_slices):
-            target_xy += smooth_square_well(
+        for s in range(bloch_config.n_slices):
+            target_xy[b, :, s] = smooth_square_well(
                 pos,
                 left=left,
                 right=left + width,
@@ -55,8 +52,4 @@ def get_smooth_targets(train_config, bloch_config, function=torch.sigmoid, overr
             centers_loc.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
             left += width + distance
 
-        targets_xy.append(target_xy)
-        centers.append(centers_loc)
-    target_xy = torch.stack(targets_xy, dim=0)
-    target_z = torch.sqrt(1 - target_xy**2)
-    return target_z, target_xy, centers, half_width
+    return target_xy

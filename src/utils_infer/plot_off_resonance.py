@@ -96,7 +96,9 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
     from utils_bloch.setup import get_smooth_targets
 
     bconfig.n_b0_values = n_values
-    target_z, target_xy, slice_centers_allB0, half_width = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
+    target_xy = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=fixed_inputs)
+    target_xy = target_xy.sum(dim=-1)
+    target_z = torch.sqrt(1 - target_xy**2)
 
     t_B1 = fixed_inputs["t_B1"]
     pos = fixed_inputs["pos"]
@@ -121,8 +123,10 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
         ax[0, 0].plot(t_B1, np.imag(B1), linewidth=0.8)
         ax[0, 0].plot(t_B1, np.abs(B1), linewidth=0.8, linestyle="dotted")
         ax[0, 1].plot(t_B1, G * np.ones(t_B1.shape), linewidth=0.8)
-        # ax01 = ax[0, 1].twinx()
-        # ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1)
+        (grad_line,) = ax[0, 1].plot(t_B1, G * np.ones(t_B1.shape), linewidth=0.8, label="Gradient")
+        ax01 = ax[0, 1].twinx()
+        (slew_line,) = ax01.plot(t_B1[:-1], np.diff(G, axis=0) / delta_t, linewidth=1, label="Slew Rate")
+        ax[0, 1].legend(handles=[grad_line, slew_line], fontsize="x-small", loc="upper left")
         ax[1, 0].plot(pos, np.real(mz[ff, :]), linewidth=0.8)
         ax[1, 0].plot(pos, target_z[ff, :], linewidth=0.8)
         ax[1, 1].plot(pos, mxy_abs, linewidth=0.8)
@@ -132,15 +136,16 @@ def plot_some_b0_values(n_values, fixed_inputs, G, B1, tconfig, bconfig, path=No
         phase = np.angle(mxy[ff, :])
         phasemin = np.inf
         phasemax = -np.inf
-        slice_centers_current_b0 = slice_centers_allB0[ff]
-        for i, c in enumerate(slice_centers_current_b0):
-            phase_loc = phase[c - half_width : c + half_width]
-            phasemin = np.min([phasemin, np.min(phase_loc)])
-            phasemax = np.max([phasemax, np.max(phase_loc)])
+
+        slices_mask = mxy_abs > 0.5
+
+        phase_loc = phase[slices_mask]
+        phasemin = np.min([phasemin, np.min(phase_loc)])
+        phasemax = np.max([phasemax, np.max(phase_loc)])
         phasemin -= 0.5 * np.abs(phasemax - phasemin)
         phasemax += 0.5 * np.abs(phasemax - phasemin)
 
-        phase[target_xy[ff, :] < 0.5] = np.nan
+        phase[~slices_mask] = np.nan
         ax_phase = ax[1, 1].twinx()
         ax_phase.set_ylabel("Phase (radians)")
         ax_phase.set_ylim(phasemin, phasemax)
