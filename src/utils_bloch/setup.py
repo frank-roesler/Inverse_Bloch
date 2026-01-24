@@ -30,7 +30,7 @@ def get_smooth_targets(train_config, bloch_config, function=torch.sigmoid, overr
     """
     smoothness = train_config.target_smoothness * 1000.0
     width = 0.02
-    distance = 0.01
+    distance = 0.015
     shift = 0.001 if train_config.shift_targets else 0.0
 
     pos = bloch_config.fixed_inputs["pos"] if override_inputs is None else override_inputs["pos"]

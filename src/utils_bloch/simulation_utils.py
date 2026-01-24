@@ -110,7 +110,7 @@ def time_loop_complex(
     return (statea, stateb)
 
 
-# @torch.compile(backend="eager")
+@torch.compile(mode="max-autotune")
 def time_loop_real(
     reAlpha: torch.Tensor,
     reBeta: torch.Tensor,

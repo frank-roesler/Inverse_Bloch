@@ -1,24 +1,20 @@
 from utils_bloch.setup import *
 from utils_train.utils import *
 from config import *
-from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error, export_param_csv
+from utils_infer import plot_timeprof, plot_off_resonance, plot_some_b0_values, plot_phase_fit_error, export_param_csv, export_as_numpy
 
 
 def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512):
-    (model, _, _, _, target_xy, tconfig, bconfig) = load_data(path, mode="inference")
+    (model, pulse, gradient, _, target_xy, tconfig, bconfig) = load_data(path, mode="inference")
 
     n_b0_values = target_xy.shape[0]
     forward_inputs = get_fixed_inputs(tfactor=bconfig.tfactor, n_b0_values=n_b0_values, Nz=Nz, Nt=Nt, pos_spacing="linear")
     B1, G = model(forward_inputs["t_B1"])
 
-    # shift = 0.0025
-    # exponent = 1j * torch.cumsum(G, dim=0) * fixed_inputs["dt_num"] * 2 * torch.pi * shift * gamma
-    # B1_left = B1 * torch.exp(-exponent)
-    # B1_right = B1 * torch.exp(exponent)
-    # B1_lleft = B1_left * torch.exp(-2 * exponent)
-    # B1_rright = B1_right * torch.exp(2 * exponent)
-    # B1 = B1_left + B1_right + B1_lleft + B1_rright
-    # n_slices = 4
+    # t = torch.linspace(0, forward_inputs["t_B1"][-1].item(), 256)
+    # B1, G = model(t.unsqueeze(1))
+    # np.save("results/2025-12-25_22-35/gradient_numpy.npy", G.detach().numpy())
+    # np.save("results/2025-12-25_22-35/pulse_numpy.npy", B1.detach().numpy())
 
     target_xy = get_smooth_targets(tconfig, bconfig, function=torch.sigmoid, override_inputs=forward_inputs)
 
@@ -28,13 +24,15 @@ def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512)
     freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
     with torch.no_grad():
         plot_some_b0_values(npts_some_b0_values, forward_inputs, G, B1, tconfig, bconfig, path=path)
-        plot_timeprof(B1, G, forward_inputs, target_xy, path=path)
-        slope = plot_phase_fit_error(forward_inputs, target_xy, B1, G, path=path)
-        export_param_csv(path, path, B1, G, forward_inputs, slope)
-        plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
+        # plot_timeprof(B1, G, forward_inputs, target_xy, path=path)
+        # slope = plot_phase_fit_error(forward_inputs, target_xy, B1, G, path=path)
+        # export_param_csv(path, path, B1, G, forward_inputs, slope)
+        # plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
     # plt.show()
 
 
 if __name__ == "__main__":
-    path = "results/2025-12-23_18-43/train_log.pt"
-    forward(path, npts_some_b0_values=8, Nz=2048, Nt=256, npts_off_resonance=512)
+    # path = "results/2025-07-12_10-48/train_log.pt"
+    # forward(path, npts_some_b0_values=8, Nz=2048, Nt=256, npts_off_resonance=512)
+    torch_path = "results/2025-12-13_18-52/train_log.pt"
+    export_as_numpy(torch_path, "results/numpy_pulses")

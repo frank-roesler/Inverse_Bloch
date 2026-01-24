@@ -4,8 +4,8 @@ target_smoothness = 4.0
 shift_targets = false
 steps = 100000
 resume_from_path = ""
-lr = { pulse = 5e-5, gradient = 5e-5 } # learning rates
-plot_loss_frequency = 20
+lr = { pulse = 2e-5, gradient = 2e-5 } # learning rates
+plot_loss_frequency = 100
 start_logging = 1000
 pre_train_inputs = false
 suppress_loss_peaks = false
@@ -17,8 +17,8 @@ n_slices = 2
 n_b0_values = 5 # needs to be odd when shift_targets == true
 flip_angle = 1.5707963267948966 # pi/2
 tfactor = 2 # pulse time is 0.64ms * tfactor
-Nz = 512 # number of mesh points in pos axis
-Nt = 64 # number of mesh points per 0.64ms time interval
+Nz = 256 # number of mesh points in pos axis
+Nt = 128 # number of mesh points per 0.64ms time interval
 pos_spacing = "nonlinear" # "nonlinear" places more mesh points in the center
 
 # MODEL PARAMETERS:

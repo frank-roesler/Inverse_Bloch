@@ -316,7 +316,7 @@ class SliceProfileLoss(torch.nn.Module):
         else:
             raise ValueError("Invalid metric. Choose 'L2' or 'L1'.")
         loss_mxy = torch.trapz(integrand, self.posAx, dim=1).mean(dim=0) / self.pos_extent
-        self.loss_mxy = loss_mxy
+        self.loss_mxy = loss_mxy  # for mixing in compute_phase_diff_var_loss()
         return loss_mxy
 
     def compute_loss_mz(self, z_profile, xy_profile, pulse, gradient, phase, phase_diff):
@@ -481,10 +481,20 @@ def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     from utils_bloch.setup import get_smooth_targets
 
     data_dict = torch.load(path, weights_only=False, map_location=device)
+    if mode == "inference":
+        pulse = data_dict["pulse"].detach().cpu()
+        gradient = data_dict["gradient"].detach().cpu()
+
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
     losses = data_dict["losses"]
     model = data_dict["model"]
+
+    # t = torch.linspace(0, 1.2998, 256)
+    # B1, G = model(t.unsqueeze(1))
+    # np.save("results/2025-07-12_10-48/pulse_numpy.npy", B1.detach().numpy())
+    # np.save("results/2025-07-12_10-48/gradient_numpy.npy", G.detach().numpy())
+
     optimizer = data_dict["optimizer"]
     tconfig = data_dict["tconfig"]
     bconfig = data_dict["bconfig"] if bconfig_override == None else bconfig_override
@@ -492,10 +502,7 @@ def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     sconfig = data_dict["sconfig"]
     target_xy = get_smooth_targets(tconfig, bconfig)
     target_z = torch.sqrt(1 - target_xy.sum(dim=-1) ** 2)
-
     if mode == "inference":
-        pulse = data_dict["pulse"].detach().cpu()
-        gradient = data_dict["gradient"].detach().cpu()
         return model, pulse, gradient, target_z, target_xy, tconfig, bconfig
     return model, target_xy, optimizer, losses, tconfig, bconfig, mconfig, sconfig
 
@@ -583,7 +590,7 @@ def train(model, target_xy, optimizer, scheduler, losses, device, tconfig, bconf
             B0_list=B0_list,
             M0=M0,
             dt=bconfig.fixed_inputs["dt_num"],
-            time_loop="complex",
+            time_loop="real",
         )
 
         currentLosses = loss_fn(mz, mxy, pulse, gradient)

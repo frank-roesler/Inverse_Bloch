@@ -90,6 +90,7 @@ def plot_phase_fit_error(fixed_inputs, target_xy, B1, G, path=None):
     mxy, mz = simulate_B0_values(fixed_inputs, B1, G, n_b0_values=n_b0_values)
 
     (slice_centers, half_width), success = count_slices(mxy.abs())
+    n_slices = slice_centers.shape[1]
     if not success:
         slice_mask = target_xy > 0.5
         slice_centers = torch.sum(slice_mask * torch.arange(slice_mask.shape[1]).unsqueeze(-1), dim=1) / slice_mask.sum(dim=1)
@@ -103,7 +104,7 @@ def plot_phase_fit_error(fixed_inputs, target_xy, B1, G, path=None):
 
     fig, ax = plt.subplots(figsize=(10, 5))
     for i, phase in enumerate(phases):
-        label = f"{freq_offsets_ppm[i//2]:.1f} ppm" if i % 2 == 0 else None
+        label = f"{freq_offsets_ppm[i//n_slices]:.1f} ppm" if i % n_slices == 0 else None
         ax.plot(phase - fitted_line, linewidth=0.8, label=label, color=colors[i % n_b0_values])
     zero = phase[0] * 0.0
     ax.plot(zero, linewidth=0.8, color="black", linestyle="dotted")
