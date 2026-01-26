@@ -12,6 +12,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import torch.nn.functional as F
 from config import *
+from utils_train.nets import get_model
 
 
 class TrainLogger:
@@ -35,8 +36,8 @@ class TrainLogger:
         self.log["step"] = step
         self.log["tconfig"]["start_step"] = step
         self.log["losses"] = losses
-        self.log["model"] = model
-        self.log["optimizer"] = optimizer
+        self.log["model_state_dict"] = model.state_dict()
+        self.log["optimizer_state_dict"] = optimizer.state_dict()
         with torch.no_grad():
             pulse, gradient = model(self.t_B1_legacy)
         self.log["pulse"] = pulse.detach().cpu()
@@ -59,7 +60,7 @@ class TrainLogger:
         self.new_optimum = True
 
     def export_json(self):
-        model_name = self.log["model"].name
+        model_name = self.log["mconfig"]["model_name"]
         export_path = os.path.join(self.export_loc, f"sms_nn_{model_name}.json")
         dur = 1000 * self.log["bconfig"]["fixed_inputs"]["t_B1"][-1].item()
 
@@ -451,7 +452,7 @@ def pre_train(target_pulse, target_gradient, model, fixed_inputs, lr=1e-4, thr=1
 def init_training(tconfig, model, lr, device=torch.device("cpu")):
     model = model.to(device)
     model.train()
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=lr["pulse"], amsgrad=True)
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=lr["pulse"], amsgrad=True)  # do not change!
     if model.name == "MixedModel":
         pulse_params = list(model.model1.parameters()) + list(model.model2.parameters())
         gradient_params = list(model.model3.parameters())
@@ -482,6 +483,11 @@ def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     from utils_bloch.setup import get_smooth_targets
 
     data_dict = torch.load(path, weights_only=False, map_location=device)
+    tconfig = TrainingConfig.from_dict(data_dict["tconfig"])
+    bconfig = BlochConfig.from_dict(data_dict["bconfig"]) if bconfig_override == None else bconfig_override
+    mconfig = ModelConfig.from_dict(data_dict["mconfig"])
+    sconfig = ScannerConfig.from_dict(data_dict["sconfig"])
+
     if mode == "inference":
         pulse = data_dict["pulse"].detach().cpu()
         gradient = data_dict["gradient"].detach().cpu()
@@ -489,18 +495,10 @@ def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     target_z = data_dict["targets"]["target_z"]
     target_xy = data_dict["targets"]["target_xy"]
     losses = data_dict["losses"]
-    model = data_dict["model"]
-
-    # t = torch.linspace(0, 1.2998, 256)
-    # B1, G = model(t.unsqueeze(1))
-    # np.save("results/2025-07-12_10-48/pulse_numpy.npy", B1.detach().numpy())
-    # np.save("results/2025-07-12_10-48/gradient_numpy.npy", G.detach().numpy())
-
-    optimizer = data_dict["optimizer"]
-    tconfig = TrainingConfig.from_dict(data_dict["tconfig"])
-    bconfig = BlochConfig.from_dict(data_dict["bconfig"]) if bconfig_override == None else bconfig_override
-    mconfig = ModelConfig.from_dict(data_dict["mconfig"])
-    sconfig = ScannerConfig.from_dict(data_dict["sconfig"])
+    model = get_model(mconfig)
+    _, optimizer, _, _ = init_training(tconfig, model, tconfig.lr, device=device)
+    model.load_state_dict(data_dict["model_state_dict"])
+    optimizer.load_state_dict(data_dict["optimizer_state_dict"])
     target_xy = get_smooth_targets(tconfig, bconfig)
     target_z = torch.sqrt(1 - target_xy.sum(dim=-1) ** 2)
     if mode == "inference":
