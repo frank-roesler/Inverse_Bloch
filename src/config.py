@@ -62,8 +62,24 @@ def get_fixed_inputs(tfactor=1.0, n_b0_values=1, Nz=4096, Nt=512, pos_spacing="l
 
 
 class InputData:
+    @classmethod
+    def from_dict(cls, data_dict):
+        inst = cls.__new__(cls)
+        if hasattr(cls, "attributes"):
+            for k in cls.attributes:
+                if k in data_dict:
+                    setattr(inst, k, data_dict[k])
+        return inst
+
+    def __init__(self, path):
+        data_dict = self.load_toml(path)
+        inst = self.from_dict(data_dict)
+        self.__dict__.update(inst.__dict__)
+
     def to_dict(self):
-        pass
+        if hasattr(self, "attributes"):
+            return {k: getattr(self, k) for k in self.attributes if hasattr(self, k)}
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def load_toml(self, path):
         with open(path, "rb") as f:
@@ -72,91 +88,54 @@ class InputData:
 
 
 class TrainingConfig(InputData):
-    def __init__(self, path):
-        super().__init__()
-        data_dict = self.load_toml(path)
-        self.start_step = data_dict["start_step"]
-        self.target_smoothness = data_dict["target_smoothness"]
-        self.shift_targets = data_dict["shift_targets"]
-        self.steps = data_dict["steps"]
-        self.resume_from_path = data_dict["resume_from_path"]
-        self.lr = data_dict["lr"]
-        self.plot_loss_frequency = data_dict["plot_loss_frequency"]
-        self.start_logging = data_dict["start_logging"]
-        self.pre_train_inputs = data_dict["pre_train_inputs"]
-        self.suppress_loss_peaks = data_dict["suppress_loss_peaks"]
-        self.loss_metric = data_dict["loss_metric"]
-        self.loss_weights = data_dict["loss_weights"]
-        self.phase_offset_in_rad = data_dict["phase_offset_in_rad"]
+    attributes = [
+        "start_step",
+        "target_smoothness",
+        "shift_targets",
+        "steps",
+        "resume_from_path",
+        "lr",
+        "plot_loss_frequency",
+        "start_logging",
+        "pre_train_inputs",
+        "suppress_loss_peaks",
+        "loss_metric",
+        "loss_weights",
+        "phase_offset_in_rad",
+    ]
 
-    def to_dict(self):
-        out_dict = {}
-        out_dict["start_step"] = self.start_step
-        out_dict["target_smoothness"] = self.target_smoothness
-        out_dict["shift_targets"] = self.shift_targets
-        out_dict["steps"] = self.steps
-        out_dict["resume_from_path"] = self.resume_from_path
-        out_dict["lr"] = self.lr
-        out_dict["plot_loss_frequency"] = self.plot_loss_frequency
-        out_dict["start_logging"] = self.start_logging
-        out_dict["pre_train_inputs"] = self.pre_train_inputs
-        out_dict["suppress_loss_peaks"] = self.suppress_loss_peaks
-        out_dict["loss_metric"] = self.loss_metric
-        out_dict["loss_weights"] = self.loss_weights
-        out_dict["phase_offset_in_rad"] = self.phase_offset_in_rad
-        return out_dict
+    def __init__(self, path):
+        super().__init__(path)
 
 
 class BlochConfig(InputData):
+    attributes = [
+        "n_slices",
+        "n_b0_values",
+        "flip_angle",
+        "tfactor",
+        "Nz",
+        "Nt",
+        "pos_spacing",
+        "fixed_inputs",
+    ]
+
     def __init__(self, path):
-        super().__init__()
-        data_dict = self.load_toml(path)
-        self.n_slices = data_dict["n_slices"]
-        self.n_b0_values = data_dict["n_b0_values"]
-        self.flip_angle = data_dict["flip_angle"]
-        self.tfactor = data_dict["tfactor"]
-        self.Nz = data_dict["Nz"]
-        self.Nt = data_dict["Nt"]
-        self.pos_spacing = data_dict["pos_spacing"]
+        super().__init__(path)
         self.set_fixed_inputs()
 
     def set_fixed_inputs(self):
         self.fixed_inputs = get_fixed_inputs(tfactor=self.tfactor, n_b0_values=self.n_b0_values, Nz=self.Nz, Nt=self.Nt, pos_spacing=self.pos_spacing, n_slices=self.n_slices)
 
-    def to_dict(self):
-        out_dict = {}
-        out_dict["n_slices"] = self.n_slices
-        out_dict["n_b0_values"] = self.n_b0_values
-        out_dict["flip_angle"] = self.flip_angle
-        out_dict["tfactor"] = self.tfactor
-        out_dict["Nz"] = self.Nz
-        out_dict["Nt"] = self.Nt
-        out_dict["pos_spacing"] = self.pos_spacing
-        out_dict["fixed_inputs"] = self.fixed_inputs
-        return out_dict
-
 
 class ModelConfig(InputData):
+    attributes = ["model_name", "model_args"]
+
     def __init__(self, t_B1, path):
-        super().__init__()
-        data_dict = self.load_toml(path)
-        self.model_name = data_dict["model_name"]
-        self.model_args = data_dict["model_args"]
+        super().__init__(path)
         self.model_args["tmin"] = t_B1[0].item()
         self.model_args["tmax"] = t_B1[-1].item()
 
-    def to_dict(self):
-        out_dict = {}
-        out_dict["model_name"] = self.model_name
-        out_dict["model_args"] = self.model_args
-        return out_dict
-
 
 class ScannerConfig(InputData):
-    def __init__(self, path):
-        super().__init__()
-        data_dict = self.load_toml(path)
-        self.scanner_params = data_dict["scanner_params"]
-
-    def to_dict(self):
-        return {"scanner_params": self.scanner_params}
+    attributes = ["scanner_params"]

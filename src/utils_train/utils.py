@@ -11,15 +11,16 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import torch.nn.functional as F
+from config import *
 
 
 class TrainLogger:
     def __init__(self, targets, tconfig, bconfig, mconfig, sconfig):
         self.log = {
-            "tconfig": tconfig,
-            "bconfig": bconfig,
-            "mconfig": mconfig,
-            "sconfig": sconfig,
+            "tconfig": tconfig.to_dict(),
+            "bconfig": bconfig.to_dict(),
+            "mconfig": mconfig.to_dict(),
+            "sconfig": sconfig.to_dict(),
             "targets": targets,
         }
         self.log["step"] = tconfig.start_step
@@ -28,11 +29,11 @@ class TrainLogger:
         self.loss_weights = tconfig.loss_weights
         self.export_loc = os.path.join("results", datetime.datetime.now().strftime("%Y-%m-%d_%H-%M"))
         self.new_optimum = False
-        self.t_B1_legacy = self.log["bconfig"].fixed_inputs["t_B1_legacy"].to(targets["target_xy"].device)
+        self.t_B1_legacy = self.log["bconfig"]["fixed_inputs"]["t_B1_legacy"].to(targets["target_xy"].device)
 
     def log_step(self, step, losses, model, optimizer):
         self.log["step"] = step
-        self.log["tconfig"].start_step = step
+        self.log["tconfig"]["start_step"] = step
         self.log["losses"] = losses
         self.log["model"] = model
         self.log["optimizer"] = optimizer
@@ -60,14 +61,14 @@ class TrainLogger:
     def export_json(self):
         model_name = self.log["model"].name
         export_path = os.path.join(self.export_loc, f"sms_nn_{model_name}.json")
-        dur = 1000 * self.log["bconfig"].fixed_inputs["t_B1"][-1].item()
+        dur = 1000 * self.log["bconfig"]["fixed_inputs"]["t_B1"][-1].item()
 
         data = {
             "id": "sms_nn_150425_MLP_square2",
             "set": {
                 "maxB1": torch.max(torch.abs(self.log["pulse"])).item(),
                 "dur": dur,
-                "pts": len(self.log["bconfig"].fixed_inputs["t_B1"]),
+                "pts": len(self.log["bconfig"]["fixed_inputs"]["t_B1"]),
                 "amplInt": None,
                 "refocFract": None,
             },
@@ -496,10 +497,10 @@ def load_data(path, mode="inference", device="cpu", bconfig_override=None):
     # np.save("results/2025-07-12_10-48/gradient_numpy.npy", G.detach().numpy())
 
     optimizer = data_dict["optimizer"]
-    tconfig = data_dict["tconfig"]
-    bconfig = data_dict["bconfig"] if bconfig_override == None else bconfig_override
-    mconfig = data_dict["mconfig"]
-    sconfig = data_dict["sconfig"]
+    tconfig = TrainingConfig.from_dict(data_dict["tconfig"])
+    bconfig = BlochConfig.from_dict(data_dict["bconfig"]) if bconfig_override == None else bconfig_override
+    mconfig = ModelConfig.from_dict(data_dict["mconfig"])
+    sconfig = ScannerConfig.from_dict(data_dict["sconfig"])
     target_xy = get_smooth_targets(tconfig, bconfig)
     target_z = torch.sqrt(1 - target_xy.sum(dim=-1) ** 2)
     if mode == "inference":

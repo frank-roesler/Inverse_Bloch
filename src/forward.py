@@ -24,15 +24,15 @@ def forward(path, npts_some_b0_values=7, Nz=512, Nt=512, npts_off_resonance=512)
     freq_offsets_Hz = torch.linspace(-8000, 8000, npts_off_resonance)
     with torch.no_grad():
         plot_some_b0_values(npts_some_b0_values, forward_inputs, G, B1, tconfig, bconfig, path=path)
-        # plot_timeprof(B1, G, forward_inputs, target_xy, path=path)
-        # slope = plot_phase_fit_error(forward_inputs, target_xy, B1, G, path=path)
-        # export_param_csv(path, path, B1, G, forward_inputs, slope)
-        # plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
+        plot_timeprof(B1, G, forward_inputs, target_xy, path=path)
+        slope = plot_phase_fit_error(forward_inputs, target_xy, B1, G, path=path)
+        export_param_csv(path, path, B1, G, forward_inputs, slope)
+        plot_off_resonance(B1 + 0j, G, forward_inputs, freq_offsets_Hz=freq_offsets_Hz, flip_angle=bconfig.flip_angle, path=path)
     # plt.show()
 
 
 if __name__ == "__main__":
-    # path = "results/2025-07-12_10-48/train_log.pt"
-    # forward(path, npts_some_b0_values=8, Nz=2048, Nt=256, npts_off_resonance=512)
-    torch_path = "results/2025-12-13_18-52/train_log.pt"
-    export_as_numpy(torch_path, "results/numpy_pulses")
+    path = "results/2026-01-26_12-37/train_log.pt"
+    forward(path, npts_some_b0_values=8, Nz=2048, Nt=256, npts_off_resonance=512)
+    # torch_path = "results/2025-12-13_18-52/train_log.pt"
+    # export_as_numpy(torch_path, "results/numpy_pulses")

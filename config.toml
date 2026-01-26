@@ -6,7 +6,7 @@ steps = 100000
 resume_from_path = ""
 lr = { pulse = 2e-5, gradient = 2e-5 } # learning rates
 plot_loss_frequency = 100
-start_logging = 1000
+start_logging = 10
 pre_train_inputs = false
 suppress_loss_peaks = false
 loss_metric = "L1"

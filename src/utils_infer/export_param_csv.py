@@ -6,6 +6,7 @@ from utils_train.utils import move_to
 from utils_bloch.setup import get_smooth_targets
 import numpy as np
 from constants import gamma, gam_hz_mt, larmor_mhz, water_ppm
+from config import *
 
 
 def write_rows_from_dict(heading, input_dict, writer, exclude=[]):
@@ -21,8 +22,8 @@ def write_rows_from_dict(heading, input_dict, writer, exclude=[]):
 def compute_actual_phase_offsets(data_dict, B1, G, fixed_inputs):
     from utils_infer import compute_phase_offsets
 
-    tconfig = data_dict["tconfig"]
-    bconfig = data_dict["bconfig"]
+    tconfig = TrainingConfig.from_dict(data_dict["tconfig"])
+    bconfig = BlochConfig.from_dict(data_dict["bconfig"])
     t_B1 = fixed_inputs["t_B1_legacy"]
     pos = fixed_inputs["pos"]
     freq_offsets_Hz = torch.linspace(-larmor_mhz * water_ppm, 0.0, bconfig.n_b0_values)
@@ -58,10 +59,10 @@ def export_param_csv(input_path, output_path, B1, G, fixed_inputs, slope):
     with open(join(dirname(output_path), "params.csv"), "w", newline="") as f:
         writer = csv.writer(f)
 
-        tconfig = data_dict["tconfig"].to_dict()
-        bconfig = data_dict["bconfig"].to_dict()
-        mconfig = data_dict["mconfig"].to_dict()
-        sconfig = data_dict["sconfig"].to_dict()
+        tconfig = data_dict["tconfig"]
+        bconfig = data_dict["bconfig"]
+        mconfig = data_dict["mconfig"]
+        sconfig = data_dict["sconfig"]
 
         write_rows_from_dict("Model Args", mconfig["model_args"], writer)
         write_rows_from_dict("Scanner Parameters", sconfig["scanner_params"], writer)

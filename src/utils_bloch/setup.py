@@ -30,7 +30,7 @@ def get_smooth_targets(train_config, bloch_config, function=torch.sigmoid, overr
     """
     smoothness = train_config.target_smoothness * 1000.0
     width = 0.02
-    distance = 0.015
+    distance = 0.01
     shift = 0.001 if train_config.shift_targets else 0.0
 
     pos = bloch_config.fixed_inputs["pos"] if override_inputs is None else override_inputs["pos"]
@@ -51,5 +51,21 @@ def get_smooth_targets(train_config, bloch_config, function=torch.sigmoid, overr
             )
             centers_loc.append(np.argmin(np.abs(pos - (left + 0.5 * width))).item())
             left += width + distance
+
+    import matplotlib.pyplot as plt
+
+    # plt.plot(pos, target_xy[0, :, :].sum(dim=-1).detach())
+    # plt.axvline(pos[centers_loc[0]], label=f"{pos[centers_loc[0]]}", color="r")
+    # plt.axvline(pos[centers_loc[1]], label=f"{pos[centers_loc[1]]}", color="k")
+    # plt.legend(loc="upper right")
+    # plt.xlim(-0.05, 0.05)
+
+    # ckpt = torch.load("/Users/frankrosler/Desktop/PhD/Python/Inverse_Bloch/results/2025-12-18_11-44/train_log.pt", weights_only=False)
+    # plt.figure()
+    # plt.plot(pos, ckpt["targets"]["target_xy"][0, :].detach())
+    # plt.axvline(pos[centers_loc[0]], label=f"{pos[centers_loc[0]]}", color="r")
+    # plt.axvline(pos[centers_loc[1]], label=f"{pos[centers_loc[1]]}", color="k")
+    # plt.legend(loc="upper right")
+    # plt.xlim(-0.05, 0.05)
 
     return target_xy
